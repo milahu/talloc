@@ -503,6 +503,9 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
+/* Define to 1 if you have the <unix.h> header file. */
+#undef HAVE_UNIX_H
+
 /* Define to 1 if you have the `unsetenv' function. */
 #undef HAVE_UNSETENV
 
@@ -646,6 +649,15 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* talloc major version */
+#undef TALLOC_BUILD_VERSION_MAJOR
+
+/* talloc minor version */
+#undef TALLOC_BUILD_VERSION_MINOR
+
+/* talloc release version */
+#undef TALLOC_BUILD_VERSION_RELEASE
 
 /* Whether telldir takes a const pointer */
 #undef TELLDIR_TAKES_CONST_DIR

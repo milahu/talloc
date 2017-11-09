@@ -46,10 +46,10 @@ if test x"$libreplacedir" = "x"; then
 	AC_MSG_ERROR([cannot find libreplace in $libreplacepaths])
 fi
 
-LIBREPLACEOBJ="replace.o"
+LIBREPLACEOBJ="$libreplacedir/replace.o"
 AC_SUBST(LIBREPLACEOBJ)
 
-LIBREPLACEOBJ="${LIBREPLACEOBJ} snprintf.o"
+LIBREPLACEOBJ="${LIBREPLACEOBJ} $libreplacedir/snprintf.o"
 
 AC_TYPE_SIGNAL
 AC_TYPE_UID_T
@@ -103,6 +103,7 @@ AC_CHECK_HEADERS(sys/time.h time.h)
 AC_CHECK_HEADERS(stdarg.h vararg.h)
 AC_CHECK_HEADERS(sys/mount.h mntent.h)
 AC_CHECK_HEADERS(stropts.h)
+AC_CHECK_HEADERS(unix.h)
 
 AC_CHECK_FUNCS(seteuid setresuid setegid setresgid chroot bzero strerror)
 AC_CHECK_FUNCS(vsyslog setlinebuf mktime ftruncate chsize rename)
