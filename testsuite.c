@@ -25,7 +25,9 @@
 
 #include "replace.h"
 #include "system/time.h"
-#include "talloc.h"
+#include <talloc.h>
+
+#include "talloc_testsuite.h"
 
 static struct timeval timeval_current(void)
 {
@@ -101,6 +103,7 @@ static double timeval_elapsed(struct timeval *tv)
 
 static unsigned int test_abort_count;
 
+#if 0
 static void test_abort_fn(const char *reason)
 {
 	printf("# test_abort_fn(%s)\n", reason);
@@ -112,6 +115,7 @@ static void test_abort_start(void)
 	test_abort_count = 0;
 	talloc_set_abort_fn(test_abort_fn);
 }
+#endif
 
 static void test_abort_stop(void)
 {
@@ -1132,6 +1136,52 @@ static bool test_pool(void)
 	return true;
 }
 
+
+static bool test_free_ref_null_context(void)
+{
+	void *p1, *p2, *p3;
+	int ret;
+
+	talloc_disable_null_tracking();
+	p1 = talloc_new(NULL);
+	p2 = talloc_new(NULL);
+
+	p3 = talloc_reference(p2, p1);
+	torture_assert("reference", p3 == p1, "failed: reference on null");
+
+	ret = talloc_free(p1);
+	torture_assert("ref free with null parent", ret == 0, "failed: free with null parent");
+	talloc_free(p2);
+
+	talloc_enable_null_tracking_no_autofree();
+	p1 = talloc_new(NULL);
+	p2 = talloc_new(NULL);
+
+	p3 = talloc_reference(p2, p1);
+	torture_assert("reference", p3 == p1, "failed: reference on null");
+
+	ret = talloc_free(p1);
+	torture_assert("ref free with null tracked parent", ret == 0, "failed: free with null parent");
+	talloc_free(p2);
+
+	return true;
+}
+
+static bool test_rusty(void)
+{
+	void *root;
+	const char *p1;
+
+	talloc_enable_null_tracking();
+	root = talloc_new(NULL);
+	p1 = talloc_strdup(root, "foo");
+	talloc_increase_ref_count(p1);
+	talloc_report_full(root, stdout);
+	talloc_free(root);
+	return true;
+}
+
+
 static void test_reset(void)
 {
 	talloc_set_log_fn(test_log_stdout);
@@ -1140,7 +1190,6 @@ static void test_reset(void)
 	talloc_enable_null_tracking_no_autofree();
 }
 
-struct torture_context;
 bool torture_local_talloc(struct torture_context *tctx)
 {
 	bool ret = true;
@@ -1185,6 +1234,10 @@ bool torture_local_talloc(struct torture_context *tctx)
 	ret &= test_talloc_free_in_destructor();
 	test_reset();
 	ret &= test_pool();
+	test_reset();
+	ret &= test_free_ref_null_context();
+	test_reset();
+	ret &= test_rusty();
 
 	if (ret) {
 		test_reset();

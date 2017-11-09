@@ -1,14 +1,11 @@
 #!/bin/sh
 
-rm -rf autom4te.cache
-rm -f configure config.h.in
+p=`dirname $0`
 
-IPATHS="-I libreplace -I lib/replace -I ../libreplace -I ../replace"
-autoconf $IPATHS || exit 1
-autoheader $IPATHS || exit 1
+echo "Setting up for waf build"
 
-rm -rf autom4te.cache
-
-echo "Now run ./configure and then make."
-exit 0
-
+echo "done. Now run $p/configure then make."
+if [ $p != "." ]; then
+	echo "Notice: The build invoke path is not the main directory! Use make with the parameter"
+	echo "-C $p. Example: make -C $p all"
+fi
