@@ -56,8 +56,12 @@
 #include <inttypes.h>
 #endif
 
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+
 #ifndef __PRI64_PREFIX
-# if __WORDSIZE == 64
+# if __WORDSIZE == 64 && ! defined __APPLE__
 #  define __PRI64_PREFIX	"l"
 # else
 #  define __PRI64_PREFIX	"ll"
@@ -104,6 +108,14 @@
 # define PRIu64		__PRI64_PREFIX "u"
 #endif
 
+#ifdef HAVE_BSD_STRING_H
+#include <bsd/string.h>
+#endif
+
+#ifdef HAVE_BSD_UNISTD_H
+#include <bsd/unistd.h>
+#endif
+
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
@@ -114,6 +126,10 @@
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+
+#ifdef HAVE_SETPROCTITLE_H
+#include <setproctitle.h>
 #endif
 
 #if STDC_HEADERS
@@ -151,6 +167,11 @@ void *rep_memmove(void *dest,const void *src,int size);
 #define memmem rep_memmem
 void *rep_memmem(const void *haystack, size_t haystacklen,
 		 const void *needle, size_t needlelen);
+#endif
+
+#ifndef HAVE_MEMALIGN
+#define memalign rep_memalign
+void *rep_memalign(size_t boundary, size_t size);
 #endif
 
 #ifndef HAVE_MKTIME
@@ -434,7 +455,7 @@ void rep_vsyslog (int facility_priority, const char *format, va_list arglist) PR
 typedef int (*comparison_fn_t)(const void *, const void *);
 #endif
 
-#ifdef REPLACE_STRPTIME
+#ifndef HAVE_WORKING_STRPTIME
 #define strptime rep_strptime
 struct tm;
 char *rep_strptime(const char *buf, const char *format, struct tm *tm);
@@ -567,6 +588,10 @@ int rep_strerror_r(int errnum, char *buf, size_t buflen);
 
 #ifndef UINT64_MAX
 #define UINT64_MAX ((uint64_t)-1)
+#endif
+
+#ifndef INT64_MAX
+#define INT64_MAX 9223372036854775807LL
 #endif
 
 #ifndef CHAR_BIT
@@ -800,6 +825,33 @@ int fdatasync(int );
 #ifndef HAVE_POLL
 #define poll rep_poll
 /* prototype is in "system/network.h" */
+#endif
+
+#if !defined(getpass)
+#ifdef REPLACE_GETPASS
+#if defined(REPLACE_GETPASS_BY_GETPASSPHRASE)
+#define getpass(prompt) getpassphrase(prompt)
+#else
+#define getpass(prompt) rep_getpass(prompt)
+char *rep_getpass(const char *prompt);
+#endif
+#endif
+#endif
+
+#ifndef HAVE_GETPEEREID
+#define getpeereid rep_getpeereid
+int rep_getpeereid(int s, uid_t *uid, gid_t *gid);
+#endif
+
+#ifndef HAVE_USLEEP
+#define usleep rep_usleep
+typedef long useconds_t;
+int usleep(useconds_t);
+#endif
+
+#ifndef HAVE_SETPROCTITLE
+#define setproctitle rep_setproctitle
+void rep_setproctitle(const char *fmt, ...) PRINTF_ATTRIBUTE(1, 2);
 #endif
 
 #endif /* _LIBREPLACE_REPLACE_H */
