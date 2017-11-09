@@ -475,6 +475,26 @@ char *rep_strcasestr(const char *haystack, const char *needle)
 }
 #endif
 
+#ifndef HAVE_STRSEP
+char *rep_strsep(char **pps, const char *delim)
+{
+	char *ret = *pps;
+	char *p = *pps;
+
+	if (p == NULL) {
+		return NULL;
+	}
+	p += strcspn(p, delim);
+	if (*p == '\0') {
+		*pps = NULL;
+	} else {
+		*p = '\0';
+		*pps = p + 1;
+	}
+	return ret;
+}
+#endif
+
 #ifndef HAVE_STRTOK_R
 /* based on GLIBC version, copyright Free Software Foundation */
 char *rep_strtok_r(char *s, const char *delim, char **save_ptr)
@@ -518,6 +538,7 @@ long long int rep_strtoll(const char *str, char **endptr, int base)
 }
 #else
 #ifdef HAVE_BSD_STRTOLL
+#undef strtoll
 long long int rep_strtoll(const char *str, char **endptr, int base)
 {
 	long long int nb = strtoll(str, endptr, base);
@@ -808,7 +829,7 @@ int rep_clock_gettime(clockid_t clk_id, struct timespec *tp)
 	struct timeval tval;
 	switch (clk_id) {
 		case 0: /* CLOCK_REALTIME :*/
-#ifdef HAVE_GETTIMEOFDAY_TZ
+#if defined(HAVE_GETTIMEOFDAY_TZ) || defined(HAVE_GETTIMEOFDAY_TZ_VOID)
 			gettimeofday(&tval,NULL);
 #else
 			gettimeofday(&tval);
