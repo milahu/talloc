@@ -97,7 +97,7 @@ def CHECK_HEADER(conf, h, add_headers=False, lib=None):
     hdrs = hlist_to_string(conf, headers=h)
     if lib is None:
         lib = ""
-    ret = conf.check(fragment='%s\nint main(void) { return 0; }' % hdrs,
+    ret = conf.check(fragment='%s\nint main(void) { return 0; }\n' % hdrs,
                      type='nolink',
                      execute=0,
                      cflags=ccflags,
@@ -251,7 +251,10 @@ def CHECK_FUNC(conf, f, link=True, lib=None, headers=None):
 
     ret = False
 
-    conf.COMPOUND_START('Checking for %s' % f)
+    in_lib_str = ""
+    if lib:
+        in_lib_str = " in %s" % lib
+    conf.COMPOUND_START('Checking for %s%s' % (f, in_lib_str))
 
     if link is None or link:
         ret = CHECK_CODE(conf,
@@ -397,13 +400,8 @@ def CHECK_CODE(conf, code, define,
     # Be strict when relying on a compiler check
     # Some compilers (e.g. xlc) ignore non-supported features as warnings
     if strict:
-        extra_cflags = None
-        if conf.env["CC_NAME"] == "gcc":
-            extra_cflags = "-Werror"
-        elif conf.env["CC_NAME"] == "xlc":
-            extra_cflags = "-qhalt=w"
-        if extra_cflags:
-            cflags.append(extra_cflags)
+        if 'WERROR_CFLAGS' in conf.env:
+            cflags.extend(conf.env['WERROR_CFLAGS'])
 
     if local_include:
         cflags.append('-I%s' % conf.path.abspath())

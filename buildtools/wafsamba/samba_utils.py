@@ -1,6 +1,7 @@
 # a waf tool to add autoconf-like macros to the configure section
 # and for SAMBA_ macros for building libraries, binaries etc
 
+import errno
 import os, sys, re, fnmatch, shlex, inspect
 from optparse import SUPPRESS_HELP
 from waflib import Build, Options, Utils, Task, Logs, Configure, Errors, Context
@@ -14,6 +15,38 @@ from waflib.Build import CACHE_SUFFIX
 # TODO: make this a --option
 LIB_PATH="shared"
 
+
+PY3 = sys.version_info[0] == 3
+
+if PY3:
+
+    # helper function to get a string from a variable that maybe 'str' or
+    # 'bytes' if 'bytes' then it is decoded using 'utf8'. If 'str' is passed
+    # it is returned unchanged
+    # Using this function is PY2/PY3 code should ensure in most cases
+    # the PY2 code runs unchanged in PY2 whereas the code in PY3 possibly
+    # decodes the variable (see PY2 implementation of this function below)
+    def get_string(bytesorstring):
+        tmp = bytesorstring
+        if isinstance(bytesorstring, bytes):
+            tmp = bytesorstring.decode('utf8')
+        elif not isinstance(bytesorstring, str):
+            raise ValueError('Expected byte of string for %s:%s' % (type(bytesorstring), bytesorstring))
+        return tmp
+
+else:
+
+    # Helper function to return string.
+    # if 'str' or 'unicode' passed in they are returned unchanged
+    # otherwise an exception is generated
+    # Using this function is PY2/PY3 code should ensure in most cases
+    # the PY2 code runs unchanged in PY2 whereas the code in PY3 possibly
+    # decodes the variable (see PY3 implementation of this function above)
+    def get_string(bytesorstring):
+        tmp = bytesorstring
+        if not(isinstance(bytesorstring, str) or isinstance(bytesorstring, unicode)):
+            raise ValueError('Expected str or unicode for %s:%s' % (type(bytesorstring), bytesorstring))
+        return tmp
 
 # sigh, python octal constants are a mess
 MODE_644 = int('644', 8)
@@ -255,6 +288,18 @@ def recursive_dirlist(dir, relbase, pattern=None):
                 continue
             ret.append(os_path_relpath(f2, relbase))
     return ret
+
+
+def symlink(src, dst, force=True):
+    """Can create symlink by force"""
+    try:
+        os.symlink(src, dst)
+    except OSError as exc:
+        if exc.errno == errno.EEXIST and force:
+            os.remove(dst)
+            os.symlink(src, dst)
+        else:
+            raise
 
 
 def mkdir_p(dir):
@@ -558,7 +603,7 @@ def load_file(filename):
 
 def reconfigure(ctx):
     '''rerun configure if necessary'''
-    if not os.path.exists(".lock-wscript"):
+    if not os.path.exists(os.environ.get('WAFLOCK', '.lock-wscript')):
         raise Errors.WafError('configure has not been run')
     import samba_wildcard
     bld = samba_wildcard.fake_build_environment()

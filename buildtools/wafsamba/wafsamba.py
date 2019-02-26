@@ -10,6 +10,7 @@ TaskGen.task_gen.apply_verif = Utils.nada
 
 # bring in the other samba modules
 from samba_utils import *
+from samba_utils import symlink
 from samba_version import *
 from samba_autoconf import *
 from samba_patterns import *
@@ -61,7 +62,7 @@ def SAMBA_BUILD_ENV(conf):
     for (source, target) in [('shared', 'shared'), ('modules', 'modules'), ('python', 'python')]:
         link_target = os.path.join(conf.env.BUILD_DIRECTORY, 'default/' + target)
         if not os.path.lexists(link_target):
-            os.symlink('../' + source, link_target)
+            symlink('../' + source, link_target)
 
     # get perl to put the blib files in the build directory
     blib_bld = os.path.join(conf.env.BUILD_DIRECTORY, 'default/pidl/blib')
@@ -739,10 +740,10 @@ def SAMBA_SCRIPT(bld, name, pattern, installdir, installname=None):
         link_dst = os.path.join(tgtdir, os.path.basename(iname))
         if os.path.islink(link_dst) and os.readlink(link_dst) == link_src:
             continue
-        if os.path.exists(link_dst):
+        if os.path.islink(link_dst):
             os.unlink(link_dst)
         Logs.info("symlink: %s -> %s/%s" % (s, installdir, iname))
-        os.symlink(link_src, link_dst)
+        symlink(link_src, link_dst)
 Build.BuildContext.SAMBA_SCRIPT = SAMBA_SCRIPT
 
 
@@ -920,7 +921,7 @@ def SAMBAMANPAGES(bld, manpages, extra_source=None):
     '''build and install manual pages'''
     bld.env.SAMBA_EXPAND_XSL = bld.srcnode.abspath() + '/docs-xml/xslt/expand-sambadoc.xsl'
     bld.env.SAMBA_MAN_XSL = bld.srcnode.abspath() + '/docs-xml/xslt/man.xsl'
-    bld.env.SAMBA_CATALOG = bld.srcnode.abspath() + '/bin/default/docs-xml/build/catalog.xml'
+    bld.env.SAMBA_CATALOG = bld.bldnode.abspath() + '/docs-xml/build/catalog.xml'
     bld.env.SAMBA_CATALOGS = 'file:///etc/xml/catalog file:///usr/local/share/xml/catalog file://' + bld.env.SAMBA_CATALOG
 
     for m in manpages.split():
