@@ -136,9 +136,6 @@ def SAMBA_LIBRARY(bld, libname, source,
                   enabled=True):
     '''define a Samba library'''
 
-    if pyembed and bld.env['IS_EXTRA_PYTHON']:
-        public_headers = None
-
     if private_library and public_headers:
         raise Errors.WafError("private library '%s' must not have public header files" %
                              libname)
@@ -222,7 +219,7 @@ def SAMBA_LIBRARY(bld, libname, source,
         if pc_files is None:
             raise Errors.WafError("public library '%s' must have pkg-config file" %
                        libname)
-        if public_headers is None and not bld.env['IS_EXTRA_PYTHON']:
+        if public_headers is None:
             raise Errors.WafError("public library '%s' must have header files" %
                        libname)
 
@@ -254,10 +251,10 @@ def SAMBA_LIBRARY(bld, libname, source,
         features += ' abi_check'
 
     if pyembed and bld.env['PYTHON_SO_ABI_FLAG']:
-        # For ABI checking, we don't care about the exact Python version.
-        # Replace the Python ABI tag (e.g. ".cpython-35m") by a generic ".py3"
+        # For ABI checking, we don't care about the Python version.
+        # Remove the Python ABI tag (e.g. ".cpython-35m")
         abi_flag = bld.env['PYTHON_SO_ABI_FLAG']
-        replacement = '.py%s' % bld.env['PYTHON_VERSION'].split('.')[0]
+        replacement = ''
         version_libname = libname.replace(abi_flag, replacement)
     else:
         version_libname = libname
