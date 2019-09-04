@@ -42,12 +42,12 @@ Build.BuildContext.CHECK_CMOCKA = CHECK_CMOCKA
 
 @conf
 def CHECK_SOCKET_WRAPPER(conf):
-    return conf.CHECK_BUNDLED_SYSTEM_PKG('socket_wrapper', minversion='1.2.1')
+    return conf.CHECK_BUNDLED_SYSTEM_PKG('socket_wrapper', minversion='1.2.3')
 Build.BuildContext.CHECK_SOCKET_WRAPPER = CHECK_SOCKET_WRAPPER
 
 @conf
 def CHECK_NSS_WRAPPER(conf):
-    return conf.CHECK_BUNDLED_SYSTEM_PKG('nss_wrapper', minversion='1.1.5')
+    return conf.CHECK_BUNDLED_SYSTEM_PKG('nss_wrapper', minversion='1.1.6')
 Build.BuildContext.CHECK_NSS_WRAPPER = CHECK_NSS_WRAPPER
 
 @conf
@@ -57,7 +57,7 @@ Build.BuildContext.CHECK_RESOLV_WRAPPER = CHECK_RESOLV_WRAPPER
 
 @conf
 def CHECK_UID_WRAPPER(conf):
-    return conf.CHECK_BUNDLED_SYSTEM_PKG('uid_wrapper', minversion='1.2.4')
+    return conf.CHECK_BUNDLED_SYSTEM_PKG('uid_wrapper', minversion='1.2.7')
 Build.BuildContext.CHECK_UID_WRAPPER = CHECK_UID_WRAPPER
 
 @conf
