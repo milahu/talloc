@@ -38,7 +38,7 @@ LIB_PATH="shared"
 
 os.environ['PYTHONUNBUFFERED'] = '1'
 
-if Context.HEXVERSION not in (0x2001100,):
+if Context.HEXVERSION not in (0x2001200,):
     Logs.error('''
 Please use the version of waf that comes with Samba, not
 a system installed version. See http://wiki.samba.org/index.php/Waf
@@ -354,6 +354,7 @@ def SAMBA_BINARY(bld, binname, source,
                  local_include=True,
                  global_include=True,
                  subsystem_name=None,
+                 allow_warnings=False,
                  pyembed=False,
                  vars=None,
                  subdir=None,
@@ -382,6 +383,8 @@ def SAMBA_BINARY(bld, binname, source,
 
     if group == 'binaries':
         subsystem_group = 'main'
+    elif group == 'build_compilers':
+        subsystem_group = 'compiler_libraries'
     else:
         subsystem_group = group
 
@@ -410,6 +413,7 @@ def SAMBA_BINARY(bld, binname, source,
                         global_include = global_include,
                         use_hostcc     = use_hostcc,
                         pyext          = pyembed,
+                        allow_warnings = allow_warnings,
                         use_global_deps= use_global_deps)
 
     bld.SET_BUILD_GROUP(group)
@@ -858,7 +862,7 @@ def INSTALL_WILDCARD(bld, destdir, pattern, chmod=MODE_644, flat=False,
     if trim_path:
         files2 = []
         for f in files:
-            files2.append(os_path_relpath(f, trim_path))
+            files2.append(os.path.relpath(f, trim_path))
         files = files2
 
     if exclude:

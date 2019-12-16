@@ -37,7 +37,7 @@ def configure(conf):
     conf.CHECK_HEADERS('linux/types.h crypt.h locale.h acl/libacl.h compat.h')
     conf.CHECK_HEADERS('acl/libacl.h attr/xattr.h compat.h ctype.h dustat.h')
     conf.CHECK_HEADERS('fcntl.h fnmatch.h glob.h history.h krb5.h langinfo.h')
-    conf.CHECK_HEADERS('libaio.h locale.h ndir.h pwd.h')
+    conf.CHECK_HEADERS('locale.h ndir.h pwd.h')
     conf.CHECK_HEADERS('shadow.h sys/acl.h')
     conf.CHECK_HEADERS('sys/attributes.h attr/attributes.h sys/capability.h sys/dir.h sys/epoll.h')
     conf.CHECK_HEADERS('port.h')
@@ -106,7 +106,18 @@ def configure(conf):
             conf.SET_TARGET_TYPE('nsl', 'SYSLIB')
     conf.CHECK_HEADERS('rpcsvc/nis.h rpcsvc/ypclnt.h', lib='tirpc nsl')
 
-    conf.CHECK_HEADERS('sys/sysctl.h')
+    # This file is decprecated with glibc >= 2.30 so we need to check if it
+    # includes a deprecation warning:
+    # #warning "The <sys/sysctl.h> header is deprecated and will be removed."
+    conf.CHECK_CODE('''
+                    #include <sys/sysctl.h>
+                    int main(void) { return 0; }
+                    ''',
+                    define='HAVE_SYS_SYSCTL_H',
+                    cflags=['-Werror=cpp'],
+                    addmain=False,
+                    msg='Checking for header sys/sysctl.h')
+
     conf.CHECK_HEADERS('sys/fileio.h sys/filesys.h sys/dustat.h sys/sysmacros.h')
     conf.CHECK_HEADERS('xfs/libxfs.h netgroup.h')
 
@@ -137,6 +148,7 @@ def configure(conf):
                     }
                     ''',
                     'HAVE_PRCTL',
+                    addmain=False,
                     headers='sys/prctl.h',
                     msg='Checking for prctl syscall')
 
@@ -190,10 +202,35 @@ def configure(conf):
     conf.CHECK_TYPE_IN('sig_atomic_t', 'signal.h', define='HAVE_SIG_ATOMIC_T_TYPE')
     conf.CHECK_FUNCS('sigsetmask siggetmask sigprocmask sigblock sigaction sigset')
 
-    conf.CHECK_FUNCS_IN('''inet_ntoa inet_aton inet_ntop inet_pton connect gethostbyname
-                           getaddrinfo getnameinfo freeaddrinfo gai_strerror socketpair''',
-                        'socket nsl', checklibc=True,
-                        headers='sys/socket.h netinet/in.h arpa/inet.h netdb.h')
+    # Those functions are normally available in libc
+    if not conf.CHECK_FUNCS('''
+                            inet_ntoa
+                            inet_aton
+                            inet_ntop
+                            inet_pton
+                            connect
+                            gethostbyname
+                            getaddrinfo
+                            getnameinfo
+                            freeaddrinfo
+                            gai_strerror
+                            socketpair''',
+                            headers='sys/socket.h netinet/in.h arpa/inet.h netdb.h'):
+        conf.CHECK_FUNCS_IN('''
+                            inet_ntoa
+                            inet_aton
+                            inet_ntop
+                            inet_pton
+                            connect
+                            gethostbyname
+                            getaddrinfo
+                            getnameinfo
+                            freeaddrinfo
+                            gai_strerror
+                            socketpair''',
+                            'socket nsl',
+                            headers='sys/socket.h netinet/in.h arpa/inet.h netdb.h')
+        conf.DEFINE('REPLACE_REQUIRES_LIBSOCKET_LIBNSL', 1)
 
     conf.CHECK_FUNCS('memset_s memset_explicit')
 
@@ -404,7 +441,7 @@ def configure(conf):
                 msg="Checking whether we can use SO_PEERCRED to get socket credentials",
                 headers='sys/types.h sys/socket.h')
 
-    #Some OS (ie. freebsd) return EINVAL if the convertion could not be done, it's not what we expect
+    #Some OS (ie. freebsd) return EINVAL if the conversion could not be done, it's not what we expect
     #Let's detect those cases
     if conf.CONFIG_SET('HAVE_STRTOLL'):
         conf.CHECK_CODE('''
@@ -421,7 +458,7 @@ def configure(conf):
                         define = 'HAVE_BSD_STRTOLL',
                         )
     conf.CHECK_FUNCS('if_nametoindex strerror_r')
-    conf.CHECK_FUNCS('getdirentries getdents syslog')
+    conf.CHECK_FUNCS('syslog')
     conf.CHECK_FUNCS('gai_strerror get_current_dir_name')
     conf.CHECK_FUNCS('timegm getifaddrs freeifaddrs mmap setgroups syscall setsid')
     conf.CHECK_FUNCS('getgrent_r getgrgid_r getgrnam_r getgrouplist getpagesize')
@@ -458,11 +495,28 @@ def configure(conf):
     conf.CHECK_C_PROTOTYPE('dlopen', 'void *dlopen(const char* filename, unsigned int flags)',
                            define='DLOPEN_TAKES_UNSIGNED_FLAGS', headers='dlfcn.h dl.h')
 
-    if conf.CHECK_FUNCS_IN('fdatasync', 'rt', checklibc=True):
+    #
+    # Check for clock_gettime and fdatasync
+    #
+    # First check libc to avoid linking libreplace against librt.
+    #
+    if conf.CHECK_FUNCS('fdatasync'):
         # some systems are missing the declaration
         conf.CHECK_DECLS('fdatasync')
+    else:
+        if conf.CHECK_FUNCS_IN('fdatasync', 'rt'):
+            # some systems are missing the declaration
+            conf.CHECK_DECLS('fdatasync')
 
-    if conf.CHECK_FUNCS_IN('clock_gettime', 'rt', checklibc=True):
+    has_clock_gettime = False
+    if conf.CHECK_FUNCS('clock_gettime'):
+        has_clock_gettime = True
+
+    if not has_clock_gettime:
+        if conf.CHECK_FUNCS_IN('clock_gettime', 'rt', checklibc=True):
+            has_clock_gettime = True
+
+    if has_clock_gettime:
         for c in ['CLOCK_MONOTONIC', 'CLOCK_PROCESS_CPUTIME_ID', 'CLOCK_REALTIME']:
             conf.CHECK_CODE('''
                 #if TIME_WITH_SYS_TIME
@@ -536,6 +590,11 @@ def configure(conf):
     PTHREAD_LDFLAGS='error'
 
     if PTHREAD_LDFLAGS == 'error':
+        # Check if pthread_attr_init() is provided by libc first!
+        if conf.CHECK_FUNCS('pthread_attr_init'):
+            PTHREAD_CFLAGS='-D_REENTRANT'
+            PTHREAD_LDFLAGS=''
+    if PTHREAD_LDFLAGS == 'error':
         if conf.CHECK_FUNCS_IN('pthread_attr_init', 'pthread'):
             PTHREAD_CFLAGS='-D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS'
             PTHREAD_LDFLAGS='-lpthread'
@@ -547,10 +606,7 @@ def configure(conf):
         if conf.CHECK_FUNCS_IN('pthread_attr_init', 'c_r'):
             PTHREAD_CFLAGS='-D_THREAD_SAFE -pthread'
             PTHREAD_LDFLAGS='-pthread'
-    if PTHREAD_LDFLAGS == 'error':
-        if conf.CHECK_FUNCS('pthread_attr_init'):
-            PTHREAD_CFLAGS='-D_REENTRANT'
-            PTHREAD_LDFLAGS='-lpthread'
+
     # especially for HP-UX, where the CHECK_FUNC macro fails to test for
     # pthread_attr_init. On pthread_mutex_lock it works there...
     if PTHREAD_LDFLAGS == 'error':
@@ -816,6 +872,8 @@ def build(bld):
 
     extra_libs = ''
     if bld.CONFIG_SET('HAVE_LIBBSD'): extra_libs += ' bsd'
+    if bld.CONFIG_SET('HAVE_LIBRT'): extra_libs += ' rt'
+    if bld.CONFIG_SET('REPLACE_REQUIRES_LIBSOCKET_LIBNSL'): extra_libs += ' socket nsl'
 
     bld.SAMBA_SUBSYSTEM('LIBREPLACE_HOSTCC',
         REPLACE_HOSTCC_SOURCE,
@@ -829,7 +887,6 @@ def build(bld):
     REPLACE_SOURCE = REPLACE_HOSTCC_SOURCE
     REPLACE_SOURCE += ' cwrap.c'
 
-    if not bld.CONFIG_SET('HAVE_CRYPT'):         REPLACE_SOURCE += ' crypt.c'
     if not bld.CONFIG_SET('HAVE_DLOPEN'):        REPLACE_SOURCE += ' dlfcn.c'
     if not bld.CONFIG_SET('HAVE_POLL'):          REPLACE_SOURCE += ' poll.c'
 
@@ -856,7 +913,7 @@ def build(bld):
                       # at the moment:
                       # hide_symbols=bld.BUILTIN_LIBRARY('replace'),
                       private_library=True,
-                      deps='crypt dl nsl socket rt attr' + extra_libs)
+                      deps='dl attr' + extra_libs)
 
     replace_test_cflags = ''
     if bld.CONFIG_SET('HAVE_WNO_FORMAT_TRUNCATION'):
