@@ -5,10 +5,10 @@ from waflib import Build, Logs, Utils, Configure, Errors
 from waflib.Configure import conf
 
 @conf
-def SAMBA_CHECK_PYTHON(conf, version=(3,5,0)):
+def SAMBA_CHECK_PYTHON(conf, version=(3,6,0)):
 
-    if conf.env.disable_python:
-        version=(2,6,0)
+    if conf.env.enable_fuzzing:
+        version=(3,5,0)
 
     # enable tool to build python extensions
     if conf.env.HAVE_PYTHON_H:
@@ -58,11 +58,8 @@ def SAMBA_CHECK_PYTHON_HEADERS(conf):
 def _check_python_headers(conf):
     conf.check_python_headers()
 
-    if conf.env['PYTHON_VERSION'] > '3':
-        abi_pattern = os.path.splitext(conf.env['pyext_PATTERN'])[0]
-        conf.env['PYTHON_SO_ABI_FLAG'] = abi_pattern % ''
-    else:
-        conf.env['PYTHON_SO_ABI_FLAG'] = ''
+    abi_pattern = os.path.splitext(conf.env['pyext_PATTERN'])[0]
+    conf.env['PYTHON_SO_ABI_FLAG'] = abi_pattern % ''
     conf.env['PYTHON_LIBNAME_SO_ABI_FLAG'] = (
         conf.env['PYTHON_SO_ABI_FLAG'].replace('_', '-'))
 
@@ -102,6 +99,10 @@ def SAMBA_PYTHON(bld, name,
     # force-disable when we can't build python modules, so
     # every single call doesn't need to pass this in.
     if not bld.PYTHON_BUILD_IS_ENABLED():
+        enabled = False
+
+    # Save time, no need to build python bindings when fuzzing
+    if bld.env.enable_fuzzing:
         enabled = False
 
     # when we support static python modules we'll need to gather

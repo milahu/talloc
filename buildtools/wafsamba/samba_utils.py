@@ -459,7 +459,7 @@ def RECURSE(ctx, directory):
         return
     visited_dirs.add(key)
     relpath = os.path.relpath(abspath, ctx.path.abspath())
-    if ctxclass in ['tmp', 'OptionsContext', 'ConfigurationContext', 'BuildContext']:
+    if ctxclass in ['tmp', 'OptionsContext', 'ConfigurationContext', 'BuildContext', 'ClangDbContext']:
         return ctx.recurse(relpath)
     if 'waflib.extras.compat15' in sys.modules:
         return ctx.recurse(relpath)
@@ -682,7 +682,7 @@ def PROCESS_SEPARATE_RULE(self, rule):
             cache[node] = True
             self.pre_recurse(node)
             try:
-                function_code = node.read('rU', None)
+                function_code = node.read('r', None)
                 exec(compile(function_code, node.abspath(), 'exec'), self.exec_dict)
             finally:
                 self.post_recurse(node)
@@ -718,6 +718,9 @@ def samba_before_apply_obj_vars(self):
     for i in v['LIBPATH']:
         if is_standard_libpath(v, i):
             v['LIBPATH'].remove(i)
+
+# Samba options are mostly on by default (administrators and packagers
+# specify features to remove, not add), which is why default=True
 
 def samba_add_onoff_option(opt, option, help=(), dest=None, default=True,
                            with_name="with", without_name="without"):

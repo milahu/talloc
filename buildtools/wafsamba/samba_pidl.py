@@ -28,6 +28,7 @@ def SAMBA_PIDL(bld, pname, source,
                     '--samba3-ndr-server' : 'srv_%s.c srv_%s.h',
                     '--samba3-ndr-client' : 'cli_%s.c cli_%s.h',
                     '--server'            : 'ndr_%s_s.c',
+                    '--server-compat'     : 'ndr_%s_scompat.c ndr_%s_scompat.h',
                     '--client'            : 'ndr_%s_c.c ndr_%s_c.h',
                     '--python'            : 'py_%s.c',
                     '--tdr-parser'        : 'tdr_%s.c tdr_%s.h',
@@ -69,6 +70,10 @@ def SAMBA_PIDL(bld, pname, source,
     if cpp == "CPP=xlc_r":
         cpp = ""
 
+    if bld.env['PIDL_DEVELOPER_MODE']:
+        pidl_dev = 'PIDL_DEVELOPER=1 '
+    else:
+        pidl_dev = ''
 
     if bld.CONFIG_SET("CC"):
         if isinstance(bld.CONFIG_GET("CC"), list):
@@ -76,7 +81,7 @@ def SAMBA_PIDL(bld, pname, source,
         else:
             cc = 'CC="%s"' % bld.CONFIG_GET("CC")
 
-    t = bld(rule='cd ${PIDL_LAUNCH_DIR} && %s %s ${PERL} ${PIDL} --quiet ${OPTIONS} --outputdir ${OUTPUTDIR} -- "${IDLSRC}"' % (cpp, cc),
+    t = bld(rule='cd ${PIDL_LAUNCH_DIR} && %s%s %s ${PERL} ${PIDL} --quiet ${OPTIONS} --outputdir ${OUTPUTDIR} -- "${IDLSRC}"' % (pidl_dev, cpp, cc),
             ext_out    = '.c',
             before     = 'c',
             update_outputs = True,
@@ -104,14 +109,34 @@ def SAMBA_PIDL(bld, pname, source,
     t.more_includes = '#' + bld.path.path_from(bld.srcnode)
 Build.BuildContext.SAMBA_PIDL = SAMBA_PIDL
 
-
 def SAMBA_PIDL_LIST(bld, name, source,
                     options='',
                     output_dir='.',
-                    generate_tables=True):
+                    generate_tables=True,
+                    generate_fuzzers=True):
     '''A wrapper for building a set of IDL files'''
     for p in TO_LIST(source):
         bld.SAMBA_PIDL(name, p, options=options, output_dir=output_dir, generate_tables=generate_tables)
+
+        # Some IDL files don't exactly match between name and
+        # "interface" so we need a way to skip those, while other IDL
+        # files have the table generation skipped entirely, on which
+        # the fuzzers rely
+        if generate_tables and generate_fuzzers:
+            interface = p[0:-4] # strip off the .idl suffix
+            bld.SAMBA_NDR_FUZZ(interface,
+                               auto_deps=True,
+                               fuzz_type="TYPE_STRUCT")
+
+            # Only generate the TYPE_STRUCT fuzzer if this isn't
+            # really DCE/RPC
+            if '--client' in options:
+                bld.SAMBA_NDR_FUZZ(interface,
+                                   auto_deps=True,
+                                   fuzz_type="TYPE_IN")
+                bld.SAMBA_NDR_FUZZ(interface,
+                                   auto_deps=True,
+                                   fuzz_type="TYPE_OUT")
 Build.BuildContext.SAMBA_PIDL_LIST = SAMBA_PIDL_LIST
 
 

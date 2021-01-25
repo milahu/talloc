@@ -38,7 +38,7 @@ LIB_PATH="shared"
 
 os.environ['PYTHONUNBUFFERED'] = '1'
 
-if Context.HEXVERSION not in (0x2001200,):
+if Context.HEXVERSION not in (0x2001400,):
     Logs.error('''
 Please use the version of waf that comes with Samba, not
 a system installed version. See http://wiki.samba.org/index.php/Waf
@@ -360,12 +360,31 @@ def SAMBA_BINARY(bld, binname, source,
                  subdir=None,
                  install=True,
                  install_path=None,
-                 enabled=True):
+                 enabled=True,
+                 fuzzer=False,
+                 for_selftest=False):
     '''define a Samba binary'''
+
+    if for_selftest:
+        install=False
+        if not bld.CONFIG_GET('ENABLE_SELFTEST'):
+            enabled=False
 
     if not enabled:
         SET_TARGET_TYPE(bld, binname, 'DISABLED')
         return
+
+    # Fuzzing builds do not build normal binaries
+    # however we must build asn1compile etc
+
+    if not use_hostcc and bld.env.enable_fuzzing != fuzzer:
+        SET_TARGET_TYPE(bld, binname, 'DISABLED')
+        return
+
+    if fuzzer:
+        install = False
+        if ldflags is None:
+            ldflags = bld.env['FUZZ_TARGET_LDFLAGS']
 
     if not SET_TARGET_TYPE(bld, binname, 'BINARY'):
         return
