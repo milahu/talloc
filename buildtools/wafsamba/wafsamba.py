@@ -38,7 +38,7 @@ LIB_PATH="shared"
 
 os.environ['PYTHONUNBUFFERED'] = '1'
 
-if Context.HEXVERSION not in (0x2001400,):
+if Context.HEXVERSION not in (0x2001500,):
     Logs.error('''
 Please use the version of waf that comes with Samba, not
 a system installed version. See http://wiki.samba.org/index.php/Waf
@@ -408,10 +408,10 @@ def SAMBA_BINARY(bld, binname, source,
         subsystem_group = group
 
     # only specify PIE flags for binaries
-    pie_cflags = cflags
+    pie_cflags = TO_LIST(cflags)
     pie_ldflags = TO_LIST(ldflags)
     if bld.env['ENABLE_PIE'] is True:
-        pie_cflags += ' -fPIE'
+        pie_cflags.extend(TO_LIST('-fPIE'))
         pie_ldflags.extend(TO_LIST('-pie'))
     if bld.env['ENABLE_RELRO'] is True:
         pie_ldflags.extend(TO_LIST('-Wl,-z,relro,-z,now'))
@@ -635,6 +635,7 @@ def SAMBA_SUBSYSTEM(bld, modname, source,
         target         = modname,
         samba_cflags   = CURRENT_CFLAGS(bld, modname, cflags,
                                         allow_warnings=allow_warnings,
+                                        use_hostcc=use_hostcc,
                                         hide_symbols=hide_symbols),
         depends_on     = depends_on,
         samba_deps     = TO_LIST(deps),
@@ -716,13 +717,13 @@ def SETUP_BUILD_GROUPS(bld):
     bld.p_ln = bld.srcnode # we do want to see all targets!
     bld.env['USING_BUILD_GROUPS'] = True
     bld.add_group('setup')
-    bld.add_group('build_compiler_source')
+    bld.add_group('generators')
+    bld.add_group('hostcc_base_build_source')
+    bld.add_group('hostcc_base_build_main')
+    bld.add_group('hostcc_build_source')
+    bld.add_group('hostcc_build_main')
     bld.add_group('vscripts')
     bld.add_group('base_libraries')
-    bld.add_group('generators')
-    bld.add_group('compiler_prototypes')
-    bld.add_group('compiler_libraries')
-    bld.add_group('build_compilers')
     bld.add_group('build_source')
     bld.add_group('prototypes')
     bld.add_group('headers')
