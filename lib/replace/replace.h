@@ -703,7 +703,7 @@ int rep_strerror_r(int errnum, char *buf, size_t buflen);
 #ifdef HAVE__Bool
 #define bool _Bool
 #else
-typedef int bool;
+#error Need a real boolean type
 #endif
 #endif
 
@@ -982,10 +982,59 @@ ssize_t rep_copy_file_range(int fd_in,
 # endif /* HAVE_FALLTHROUGH_ATTRIBUTE */
 #endif /* FALL_THROUGH */
 
-bool nss_wrapper_enabled(void);
-bool nss_wrapper_hosts_enabled(void);
-bool socket_wrapper_enabled(void);
-bool uid_wrapper_enabled(void);
+struct __rep_cwrap_enabled_state {
+	const char *fnname;
+	bool cached;
+	bool retval;
+};
+
+static inline bool __rep_cwrap_enabled_fn(struct __rep_cwrap_enabled_state *state)
+{
+	bool (*__wrapper_enabled_fn)(void) = NULL;
+
+	if (state->cached) {
+		return state->retval;
+	}
+	state->retval = false;
+	state->cached = true;
+
+	__wrapper_enabled_fn = (bool (*)(void))dlsym(RTLD_DEFAULT, state->fnname);
+	if (__wrapper_enabled_fn == NULL) {
+		return state->retval;
+	}
+
+	state->retval = __wrapper_enabled_fn();
+	return state->retval;
+}
+
+static inline bool nss_wrapper_enabled(void)
+{
+	struct __rep_cwrap_enabled_state state = {
+		.fnname = "nss_wrapper_enabled",
+	};
+	return __rep_cwrap_enabled_fn(&state);
+}
+static inline bool nss_wrapper_hosts_enabled(void)
+{
+	struct __rep_cwrap_enabled_state state = {
+		.fnname = "nss_wrapper_hosts_enabled",
+	};
+	return __rep_cwrap_enabled_fn(&state);
+}
+static inline bool socket_wrapper_enabled(void)
+{
+	struct __rep_cwrap_enabled_state state = {
+		.fnname = "socket_wrapper_enabled",
+	};
+	return __rep_cwrap_enabled_fn(&state);
+}
+static inline bool uid_wrapper_enabled(void)
+{
+	struct __rep_cwrap_enabled_state state = {
+		.fnname = "uid_wrapper_enabled",
+	};
+	return __rep_cwrap_enabled_fn(&state);
+}
 
 static inline bool _hexcharval(char c, uint8_t *val)
 {
