@@ -8,6 +8,13 @@ import wafsamba
 from samba_utils import symlink
 from optparse import SUPPRESS_HELP
 
+def get_libc_version():
+    import ctypes
+    libc = ctypes.CDLL("libc.so.6")
+    gnu_get_libc_version = libc.gnu_get_libc_version
+    gnu_get_libc_version.restype = ctypes.c_char_p
+    return gnu_get_libc_version().decode()
+
 phs = os.environ.get("PYTHONHASHSEED", None)
 if phs != "1":
     raise Errors.WafError('''PYTHONHASHSEED=1 missing! Don't use waf directly, use ./configure and make!''')
@@ -63,9 +70,12 @@ This allows that to be disabled, to ensure that other software does
 not use these libraries and they are placed in a private filesystem
 prefix.
 
+Likewise, it allows the value of DEFAULT (currently {','.join(Context.g_module.DEFAULT_PRIVATE_LIBS) if getattr(Context.g_module, 'DEFAULT_PRIVATE_LIBS', False) else "''"})
+to be overridden, allowing a private-by-default library to be exposed.
+
 May include !LIBNAME to disable making a library private in order to
-limit the effect of 'ALL' '''),
-                   action="store", dest='PRIVATE_LIBS', default='')
+limit the effect of 'ALL' and 'DEFAULT'.'''),
+                   action="store", dest='PRIVATE_LIBS', default='DEFAULT')
 
     extension_default = default_value('PRIVATE_EXTENSION_DEFAULT')
     gr.add_option('--private-library-extension',
@@ -285,6 +295,9 @@ Currently the only tested value is 'smbtorture,smbd/smbd' for Samba'''),
     opt.add_option('--disable-python',
                     help='do not generate python modules',
                     action='store_true', dest='disable_python', default=False)
+    opt.add_option('--enable-rust',
+                   help='build rust modules',
+                   action='store_true', dest='enable_rust', default=False)
 
 
 @Utils.run_once
@@ -325,6 +338,10 @@ def configure(conf):
     conf.env.PRIVATELIBDIR = Options.options.PRIVATELIBDIR
     conf.env.BUNDLED_LIBS = Options.options.BUNDLED_LIBS.split(',')
     conf.env.SYSTEM_LIBS = ()
+
+    if getattr(Context.g_module, 'DEFAULT_PRIVATE_LIBS', False):
+        conf.env.DEFAULT_PRIVATE_LIBS = Context.g_module.DEFAULT_PRIVATE_LIBS
+
     conf.env.PRIVATE_LIBS = Options.options.PRIVATE_LIBS.split(',')
     conf.env.BUILTIN_LIBRARIES = Options.options.BUILTIN_LIBRARIES.split(',')
     conf.env.NONSHARED_BINARIES = Options.options.NONSHARED_BINARIES.split(',')
@@ -344,6 +361,13 @@ def configure(conf):
     conf.env.AUTOCONF_PROGRAM_PREFIX = Options.options.AUTOCONF_PROGRAM_PREFIX
 
     conf.env.disable_python = Options.options.disable_python
+    conf.env.enable_rust = Options.options.enable_rust
+    if Options.options.enable_rust:
+        glibc_vers = float('.'.join(get_libc_version().split('.')[:2]))
+        if glibc_vers < 2.32:
+            conf.fatal('--enable-rust cannot be specified with '
+                       'glibc version %s' % glibc_vers)
+        conf.DEFINE('HAVE_RUST', '1')
 
     if (conf.env.AUTOCONF_HOST and
         conf.env.AUTOCONF_BUILD and
