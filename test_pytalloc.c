@@ -26,29 +26,35 @@
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <Python.h>
+#include "lib/replace/system/python.h"
 #include <talloc.h>
 #include <pytalloc.h>
 
-static PyObject *testpytalloc_new(PyTypeObject *mod)
+static PyObject *testpytalloc_new(PyTypeObject *mod,
+		PyObject *Py_UNUSED(ignored))
 {
 	char *obj = talloc_strdup(NULL, "This is a test string");;
 	return pytalloc_steal(pytalloc_GetObjectType(), obj);
 }
 
-static PyObject *testpytalloc_get_object_type(PyObject *mod) {
+static PyObject *testpytalloc_get_object_type(PyObject *mod,
+		PyObject *Py_UNUSED(ignored))
+{
 	PyObject *type = (PyObject *)pytalloc_GetObjectType();
 	Py_INCREF(type);
 	return type;
 }
 
-static PyObject *testpytalloc_base_new(PyTypeObject *mod)
+static PyObject *testpytalloc_base_new(PyTypeObject *mod,
+		PyObject *Py_UNUSED(ignored))
 {
 	char *obj = talloc_strdup(NULL, "This is a test string for a BaseObject");;
 	return pytalloc_steal(pytalloc_GetBaseObjectType(), obj);
 }
 
-static PyObject *testpytalloc_base_get_object_type(PyObject *mod) {
+static PyObject *testpytalloc_base_get_object_type(PyObject *mod,
+		PyObject *Py_UNUSED(ignored))
+{
 	PyObject *type = (PyObject *)pytalloc_GetBaseObjectType();
 	Py_INCREF(type);
 	return type;
@@ -89,7 +95,7 @@ static PyMethodDef test_talloc_methods[] = {
 		"call pytalloc_reference_ex"},
 	{ "base_reference", (PyCFunction)testpytalloc_base_reference, METH_VARARGS,
 		"call pytalloc_reference_ex"},
-	{ NULL }
+	{0}
 };
 
 static PyTypeObject DObject_Type;
@@ -175,7 +181,6 @@ static PyTypeObject DBaseObject_Type = {
 
 #define MODULE_DOC PyDoc_STR("Test utility module for pytalloc")
 
-#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     .m_name = "_test_pytalloc",
@@ -183,7 +188,6 @@ static struct PyModuleDef moduledef = {
     .m_size = -1,
     .m_methods = test_talloc_methods,
 };
-#endif
 
 static PyObject *module_init(void);
 static PyObject *module_init(void)
@@ -201,11 +205,7 @@ static PyObject *module_init(void)
 		return NULL;
 	}
 
-#if PY_MAJOR_VERSION >= 3
 	m = PyModule_Create(&moduledef);
-#else
-	m = Py_InitModule3("_test_pytalloc", test_talloc_methods, MODULE_DOC);
-#endif
 
 	if (m == NULL) {
 		return NULL;
@@ -223,16 +223,8 @@ static PyObject *module_init(void)
 }
 
 
-#if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC PyInit__test_pytalloc(void);
 PyMODINIT_FUNC PyInit__test_pytalloc(void)
 {
 	return module_init();
 }
-#else
-void init_test_pytalloc(void);
-void init_test_pytalloc(void)
-{
-	module_init();
-}
-#endif

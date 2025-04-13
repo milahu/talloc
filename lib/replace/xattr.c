@@ -1,4 +1,4 @@
-/* 
+/*
    Unix SMB/CIFS implementation.
    replacement routines for xattr implementations
    Copyright (C) Jeremy Allison  1998-2005
@@ -10,7 +10,7 @@
      ** NOTE! The following LGPL license applies to the replace
      ** library. This does NOT imply that all of Samba is released
      ** under the LGPL
-   
+
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
    License as published by the Free Software Foundation; either
@@ -42,25 +42,25 @@ static int solaris_openat(int fildes, const char *path, int oflag, mode_t mode);
 #endif
 
 /**************************************************************************
- Wrappers for extented attribute calls. Based on the Linux package with
+ Wrappers for extended attribute calls. Based on the Linux package with
  support for IRIX and (Net|Free)BSD also. Expand as other systems have them.
 ****************************************************************************/
 
 ssize_t rep_getxattr (const char *path, const char *name, void *value, size_t size)
 {
-#if defined(HAVE_GETXATTR)
+#if defined(HAVE_XATTR_XATTR)
 #ifndef XATTR_ADDITIONAL_OPTIONS
 	return getxattr(path, name, value, size);
 #else
 
-/* So that we do not recursivly call this function */
+/* So that we do not recursively call this function */
 #undef getxattr
 	int options = 0;
 	return getxattr(path, name, value, size, 0, options);
 #endif
-#elif defined(HAVE_GETEA)
+#elif defined(HAVE_XATTR_EA)
 	return getea(path, name, value, size);
-#elif defined(HAVE_EXTATTR_GET_FILE)
+#elif defined(HAVE_XATTR_EXTATTR)
 	ssize_t retval;
 	int attrnamespace;
 	const char *attrname;
@@ -93,7 +93,7 @@ ssize_t rep_getxattr (const char *path, const char *name, void *value, size_t si
 	}
 
 	return -1;
-#elif defined(HAVE_ATTR_GET)
+#elif defined(HAVE_XATTR_ATTR)
 	int retval, flags = 0;
 	int valuelength = (int)size;
 	char *attrname = strchr(name,'.') + 1;
@@ -122,19 +122,19 @@ ssize_t rep_getxattr (const char *path, const char *name, void *value, size_t si
 
 ssize_t rep_fgetxattr (int filedes, const char *name, void *value, size_t size)
 {
-#if defined(HAVE_FGETXATTR)
+#if defined(HAVE_XATTR_XATTR)
 #ifndef XATTR_ADDITIONAL_OPTIONS
 	return fgetxattr(filedes, name, value, size);
 #else
 
-/* So that we do not recursivly call this function */
+/* So that we do not recursively call this function */
 #undef fgetxattr
 	int options = 0;
 	return fgetxattr(filedes, name, value, size, 0, options);
 #endif
-#elif defined(HAVE_FGETEA)
+#elif defined(HAVE_XATTR_EA)
 	return fgetea(filedes, name, value, size);
-#elif defined(HAVE_EXTATTR_GET_FD)
+#elif defined(HAVE_XATTR_EXTATTR)
 	ssize_t retval;
 	int attrnamespace;
 	const char *attrname;
@@ -162,7 +162,7 @@ ssize_t rep_fgetxattr (int filedes, const char *name, void *value, size_t size)
 	}
 
 	return -1;
-#elif defined(HAVE_ATTR_GETF)
+#elif defined(HAVE_XATTR_ATTR)
 	int retval, flags = 0;
 	int valuelength = (int)size;
 	char *attrname = strchr(name,'.') + 1;
@@ -188,7 +188,7 @@ ssize_t rep_fgetxattr (int filedes, const char *name, void *value, size_t size)
 #endif
 }
 
-#if defined(HAVE_EXTATTR_LIST_FILE)
+#if defined(HAVE_XATTR_EXTATTR)
 
 #define EXTATTR_PREFIX(s)	(s), (sizeof((s))-1)
 
@@ -196,7 +196,7 @@ static struct {
         int space;
 	const char *name;
 	size_t len;
-} 
+}
 extattr[] = {
 	{ EXTATTR_NAMESPACE_SYSTEM, EXTATTR_PREFIX("system.") },
         { EXTATTR_NAMESPACE_USER, EXTATTR_PREFIX("user.") },
@@ -210,7 +210,8 @@ typedef union {
 static ssize_t bsd_attr_list (int type, extattr_arg arg, char *list, size_t size)
 {
 	ssize_t list_size, total_size = 0;
-	int i, t, len;
+	int i, len;
+	size_t t;
 	char *buf;
 	/* Iterate through extattr(2) namespaces */
 	for(t = 0; t < ARRAY_SIZE(extattr); t++) {
@@ -219,26 +220,20 @@ static ssize_t bsd_attr_list (int type, extattr_arg arg, char *list, size_t size
 			continue;
 		}
 		switch(type) {
-#if defined(HAVE_EXTATTR_LIST_FILE)
 			case 0:
 				list_size = extattr_list_file(arg.path, extattr[t].space, list, size);
 				break;
-#endif
-#if defined(HAVE_EXTATTR_LIST_LINK)
 			case 1:
 				list_size = extattr_list_link(arg.path, extattr[t].space, list, size);
 				break;
-#endif
-#if defined(HAVE_EXTATTR_LIST_FD)
 			case 2:
 				list_size = extattr_list_fd(arg.filedes, extattr[t].space, list, size);
 				break;
-#endif
 			default:
 				errno = ENOSYS;
 				return -1;
 		}
-		/* Some error happend. Errno should be set by the previous call */
+		/* Some error happened. Errno should be set by the previous call */
 		if(list_size < 0)
 			return -1;
 		/* No attributes */
@@ -250,7 +245,7 @@ static ssize_t bsd_attr_list (int type, extattr_arg arg, char *list, size_t size
 		   problem with the emulation.
 		*/
 		if(list == NULL) {
-			/* Take the worse case of one char attribute names - 
+			/* Take the worse case of one char attribute names -
 			   two bytes per name plus one more for sanity.
 			*/
 			total_size += list_size + (list_size/2 + 1)*extattr[t].len;
@@ -272,6 +267,18 @@ static ssize_t bsd_attr_list (int type, extattr_arg arg, char *list, size_t size
 
 		for(i = 0; i < list_size; i += len + 1) {
 			len = buf[i];
+
+			/*
+			 * If for some reason we receive a truncated
+			 * return from call to list xattrs the pascal
+			 * string lengths will not be changed and
+			 * therefore we must check that we're not
+			 * reading garbage data or off end of array
+			 */
+			if (len + i >= list_size) {
+				errno = ERANGE;
+				return -1;
+			}
 			strncpy(list, extattr[t].name, extattr[t].len + 1);
 			list += extattr[t].len;
 			strncpy(list, buf + i + 1, len);
@@ -285,7 +292,7 @@ static ssize_t bsd_attr_list (int type, extattr_arg arg, char *list, size_t size
 
 #endif
 
-#if defined(HAVE_ATTR_LIST) && (defined(HAVE_SYS_ATTRIBUTES_H) || defined(HAVE_ATTR_ATTRIBUTES_H))
+#if defined(HAVE_XATTR_ATTR) && (defined(HAVE_SYS_ATTRIBUTES_H) || defined(HAVE_ATTR_ATTRIBUTES_H))
 static char attr_buffer[ATTR_MAX_VALUELEN];
 
 static ssize_t irix_attr_list(const char *path, int filedes, char *list, size_t size, int flags)
@@ -355,22 +362,22 @@ static ssize_t irix_attr_list(const char *path, int filedes, char *list, size_t 
 
 ssize_t rep_listxattr (const char *path, char *list, size_t size)
 {
-#if defined(HAVE_LISTXATTR)
+#if defined(HAVE_XATTR_XATTR)
 #ifndef XATTR_ADDITIONAL_OPTIONS
 	return listxattr(path, list, size);
 #else
-/* So that we do not recursivly call this function */
+/* So that we do not recursively call this function */
 #undef listxattr
 	int options = 0;
 	return listxattr(path, list, size, options);
 #endif
-#elif defined(HAVE_LISTEA)
+#elif defined(HAVE_XATTR_EA)
 	return listea(path, list, size);
-#elif defined(HAVE_EXTATTR_LIST_FILE)
+#elif defined(HAVE_XATTR_EXTATTR)
 	extattr_arg arg;
 	arg.path = path;
 	return bsd_attr_list(0, arg, list, size);
-#elif defined(HAVE_ATTR_LIST) && defined(HAVE_SYS_ATTRIBUTES_H)
+#elif defined(HAVE_XATTR_ATTR) && defined(HAVE_SYS_ATTRIBUTES_H)
 	return irix_attr_list(path, 0, list, size, 0);
 #elif defined(HAVE_ATTROPEN)
 	ssize_t ret = -1;
@@ -388,22 +395,22 @@ ssize_t rep_listxattr (const char *path, char *list, size_t size)
 
 ssize_t rep_flistxattr (int filedes, char *list, size_t size)
 {
-#if defined(HAVE_FLISTXATTR)
+#if defined(HAVE_XATTR_XATTR)
 #ifndef XATTR_ADDITIONAL_OPTIONS
 	return flistxattr(filedes, list, size);
 #else
-/* So that we do not recursivly call this function */
+/* So that we do not recursively call this function */
 #undef flistxattr
 	int options = 0;
 	return flistxattr(filedes, list, size, options);
 #endif
-#elif defined(HAVE_FLISTEA)
+#elif defined(HAVE_XATTR_EA)
 	return flistea(filedes, list, size);
-#elif defined(HAVE_EXTATTR_LIST_FD)
+#elif defined(HAVE_XATTR_EXTATTR)
 	extattr_arg arg;
 	arg.filedes = filedes;
 	return bsd_attr_list(2, arg, list, size);
-#elif defined(HAVE_ATTR_LISTF)
+#elif defined(HAVE_XATTR_ATTR)
 	return irix_attr_list(NULL, filedes, list, size, 0);
 #elif defined(HAVE_ATTROPEN)
 	ssize_t ret = -1;
@@ -421,18 +428,18 @@ ssize_t rep_flistxattr (int filedes, char *list, size_t size)
 
 int rep_removexattr (const char *path, const char *name)
 {
-#if defined(HAVE_REMOVEXATTR)
+#if defined(HAVE_XATTR_XATTR)
 #ifndef XATTR_ADDITIONAL_OPTIONS
 	return removexattr(path, name);
 #else
-/* So that we do not recursivly call this function */
+/* So that we do not recursively call this function */
 #undef removexattr
 	int options = 0;
 	return removexattr(path, name, options);
 #endif
-#elif defined(HAVE_REMOVEEA)
+#elif defined(HAVE_XATTR_EA)
 	return removeea(path, name);
-#elif defined(HAVE_EXTATTR_DELETE_FILE)
+#elif defined(HAVE_XATTR_EXTATTR)
 	int attrnamespace;
 	const char *attrname;
 
@@ -448,7 +455,7 @@ int rep_removexattr (const char *path, const char *name)
 	}
 
 	return extattr_delete_file(path, attrnamespace, attrname);
-#elif defined(HAVE_ATTR_REMOVE)
+#elif defined(HAVE_XATTR_ATTR)
 	int flags = 0;
 	char *attrname = strchr(name,'.') + 1;
 
@@ -471,18 +478,18 @@ int rep_removexattr (const char *path, const char *name)
 
 int rep_fremovexattr (int filedes, const char *name)
 {
-#if defined(HAVE_FREMOVEXATTR)
+#if defined(HAVE_XATTR_XATTR)
 #ifndef XATTR_ADDITIONAL_OPTIONS
 	return fremovexattr(filedes, name);
 #else
-/* So that we do not recursivly call this function */
+/* So that we do not recursively call this function */
 #undef fremovexattr
 	int options = 0;
 	return fremovexattr(filedes, name, options);
 #endif
-#elif defined(HAVE_FREMOVEEA)
+#elif defined(HAVE_XATTR_EA)
 	return fremoveea(filedes, name);
-#elif defined(HAVE_EXTATTR_DELETE_FD)
+#elif defined(HAVE_XATTR_EXTATTR)
 	int attrnamespace;
 	const char *attrname;
 
@@ -498,7 +505,7 @@ int rep_fremovexattr (int filedes, const char *name)
 	}
 
 	return extattr_delete_fd(filedes, attrnamespace, attrname);
-#elif defined(HAVE_ATTR_REMOVEF)
+#elif defined(HAVE_XATTR_ATTR)
 	int flags = 0;
 	char *attrname = strchr(name,'.') + 1;
 
@@ -521,19 +528,44 @@ int rep_fremovexattr (int filedes, const char *name)
 
 int rep_setxattr (const char *path, const char *name, const void *value, size_t size, int flags)
 {
-#if defined(HAVE_SETXATTR)
+	int retval = -1;
+#if defined(HAVE_XATTR_XATTR)
 #ifndef XATTR_ADDITIONAL_OPTIONS
-	return setxattr(path, name, value, size, flags);
+	retval = setxattr(path, name, value, size, flags);
+	if (retval < 0) {
+		if (errno == ENOSPC || errno == E2BIG) {
+			errno = ENAMETOOLONG;
+		}
+	}
+	return retval;
 #else
-/* So that we do not recursivly call this function */
+/* So that we do not recursively call this function */
 #undef setxattr
-	int options = 0;
-	return setxattr(path, name, value, size, 0, options);
+	retval = setxattr(path, name, value, size, 0, flags);
+	if (retval < 0) {
+		if (errno == E2BIG) {
+			errno = ENAMETOOLONG;
+		}
+	}
+	return retval;
 #endif
-#elif defined(HAVE_SETEA)
-	return setea(path, name, value, size, flags);
-#elif defined(HAVE_EXTATTR_SET_FILE)
-	int retval = 0;
+#elif defined(HAVE_XATTR_EA)
+	if (flags) {
+		retval = getea(path, name, NULL, 0);
+		if (retval < 0) {
+			if (flags & XATTR_REPLACE && errno == ENOATTR) {
+				return -1;
+			}
+		} else {
+			if (flags & XATTR_CREATE) {
+				errno = EEXIST;
+				return -1;
+			}
+		}
+	}
+	retval = setea(path, name, value, size, 0);
+	return retval;
+#elif defined(HAVE_XATTR_EXTATTR)
 	int attrnamespace;
 	const char *attrname;
 
@@ -569,7 +601,7 @@ int rep_setxattr (const char *path, const char *name, const void *value, size_t 
 	}
 	retval = extattr_set_file(path, attrnamespace, attrname, value, size);
 	return (retval < 0) ? -1 : 0;
-#elif defined(HAVE_ATTR_SET)
+#elif defined(HAVE_XATTR_ATTR)
 	int myflags = 0;
 	char *attrname = strchr(name,'.') + 1;
 
@@ -577,19 +609,24 @@ int rep_setxattr (const char *path, const char *name, const void *value, size_t 
 	if (flags & XATTR_CREATE) myflags |= ATTR_CREATE;
 	if (flags & XATTR_REPLACE) myflags |= ATTR_REPLACE;
 
-	return attr_set(path, attrname, (const char *)value, size, myflags);
+	retval = attr_set(path, attrname, (const char *)value, size, myflags);
+	if (retval < 0) {
+		if (errno == E2BIG) {
+			errno = ENAMETOOLONG;
+		}
+	}
+	return retval;
 #elif defined(HAVE_ATTROPEN)
-	int ret = -1;
 	int myflags = O_RDWR;
 	int attrfd;
 	if (flags & XATTR_CREATE) myflags |= O_EXCL;
 	if (!(flags & XATTR_REPLACE)) myflags |= O_CREAT;
 	attrfd = solaris_attropen(path, name, myflags, (mode_t) SOLARIS_ATTRMODE);
 	if (attrfd >= 0) {
-		ret = solaris_write_xattr(attrfd, value, size);
+		retval = solaris_write_xattr(attrfd, value, size);
 		close(attrfd);
 	}
-	return ret;
+	return retval;
 #else
 	errno = ENOSYS;
 	return -1;
@@ -598,19 +635,44 @@ int rep_setxattr (const char *path, const char *name, const void *value, size_t 
 
 int rep_fsetxattr (int filedes, const char *name, const void *value, size_t size, int flags)
 {
-#if defined(HAVE_FSETXATTR)
+	int retval = -1;
+#if defined(HAVE_XATTR_XATTR)
 #ifndef XATTR_ADDITIONAL_OPTIONS
-	return fsetxattr(filedes, name, value, size, flags);
+	retval = fsetxattr(filedes, name, value, size, flags);
+	if (retval < 0) {
+		if (errno == ENOSPC) {
+			errno = ENAMETOOLONG;
+		}
+	}
+	return retval;
 #else
-/* So that we do not recursivly call this function */
+/* So that we do not recursively call this function */
 #undef fsetxattr
-	int options = 0;
-	return fsetxattr(filedes, name, value, size, 0, options);
+	retval = fsetxattr(filedes, name, value, size, 0, flags);
+	if (retval < 0) {
+		if (errno == E2BIG) {
+			errno = ENAMETOOLONG;
+		}
+	}
+	return retval;
 #endif
-#elif defined(HAVE_FSETEA)
-	return fsetea(filedes, name, value, size, flags);
-#elif defined(HAVE_EXTATTR_SET_FD)
-	int retval = 0;
+#elif defined(HAVE_XATTR_EA)
+	if (flags) {
+		retval = fgetea(filedes, name, NULL, 0);
+		if (retval < 0) {
+			if (flags & XATTR_REPLACE && errno == ENOATTR) {
+				return -1;
+			}
+		} else {
+			if (flags & XATTR_CREATE) {
+				errno = EEXIST;
+				return -1;
+			}
+		}
+	}
+	retval = fsetea(filedes, name, value, size, 0);
+	return retval;
+#elif defined(HAVE_XATTR_EXTATTR)
 	int attrnamespace;
 	const char *attrname;
 
@@ -646,7 +708,7 @@ int rep_fsetxattr (int filedes, const char *name, const void *value, size_t size
 	}
 	retval = extattr_set_fd(filedes, attrnamespace, attrname, value, size);
 	return (retval < 0) ? -1 : 0;
-#elif defined(HAVE_ATTR_SETF)
+#elif defined(HAVE_XATTR_ATTR)
 	int myflags = 0;
 	char *attrname = strchr(name,'.') + 1;
 
@@ -656,17 +718,16 @@ int rep_fsetxattr (int filedes, const char *name, const void *value, size_t size
 
 	return attr_setf(filedes, attrname, (const char *)value, size, myflags);
 #elif defined(HAVE_ATTROPEN)
-	int ret = -1;
 	int myflags = O_RDWR | O_XATTR;
 	int attrfd;
 	if (flags & XATTR_CREATE) myflags |= O_EXCL;
 	if (!(flags & XATTR_REPLACE)) myflags |= O_CREAT;
 	attrfd = solaris_openat(filedes, name, myflags, (mode_t) SOLARIS_ATTRMODE);
 	if (attrfd >= 0) {
-		ret = solaris_write_xattr(attrfd, value, size);
+		retval = solaris_write_xattr(attrfd, value, size);
 		close(attrfd);
 	}
-	return ret;
+	return retval;
 #else
 	errno = ENOSYS;
 	return -1;

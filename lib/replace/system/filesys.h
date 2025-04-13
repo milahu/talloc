@@ -36,7 +36,8 @@
 #include <sys/param.h>
 #endif
 
-#ifdef HAVE_SYS_MOUNT_H
+/* This include is required on UNIX (*BSD, AIX, ...) for statfs() */
+#if !defined(LINUX) && defined(HAVE_SYS_MOUNT_H)
 #include <sys/mount.h>
 #endif
 
@@ -44,6 +45,7 @@
 #include <mntent.h>
 #endif
 
+/* This include is required on Linux for statfs() */
 #ifdef HAVE_SYS_VFS_H
 #include <sys/vfs.h>
 #endif
@@ -107,25 +109,15 @@
 #include <sys/uio.h>
 #endif
 
-/*
- * Veritas File System.  Often in addition to native.
- * Quotas different.
- */
-#if defined(HAVE_SYS_FS_VX_QUOTA_H)
-#define VXFS_QUOTA
-#endif
-
-#if HAVE_SYS_ATTRIBUTES_H
-#include <sys/attributes.h>
-#elif HAVE_ATTR_ATTRIBUTES_H
-#include <attr/attributes.h>
-#endif
-
 /* mutually exclusive (SuSE 8.2) */
-#if HAVE_ATTR_XATTR_H
-#include <attr/xattr.h>
-#elif HAVE_SYS_XATTR_H
+#if defined(HAVE_SYS_XATTR_H)
 #include <sys/xattr.h>
+#elif defined(HAVE_ATTR_XATTR_H)
+#include <attr/xattr.h>
+#elif defined(HAVE_SYS_ATTRIBUTES_H)
+#include <sys/attributes.h>
+#elif defined(HAVE_ATTR_ATTRIBUTES_H)
+#include <attr/attributes.h>
 #endif
 
 #ifdef HAVE_SYS_EA_H
@@ -209,6 +201,10 @@
 #define mkdir(d,m) _mkdir(d)
 #endif
 
+#ifdef DISABLE_OPATH
+#undef O_PATH
+#endif
+
 /*
    this allows us to use a uniform error handling for our xattr
    wrappers
@@ -218,52 +214,97 @@
 #endif
 
 
-#if !defined(HAVE_GETXATTR) || defined(XATTR_ADDITIONAL_OPTIONS)
+#if !defined(HAVE_XATTR_XATTR) || defined(XATTR_ADDITIONAL_OPTIONS)
+
 ssize_t rep_getxattr (const char *path, const char *name, void *value, size_t size);
 #define getxattr(path, name, value, size) rep_getxattr(path, name, value, size)
 /* define is in "replace.h" */
-#endif
-
-#if !defined(HAVE_FGETXATTR) || defined(XATTR_ADDITIONAL_OPTIONS)
 ssize_t rep_fgetxattr (int filedes, const char *name, void *value, size_t size);
 #define fgetxattr(filedes, name, value, size) rep_fgetxattr(filedes, name, value, size)
 /* define is in "replace.h" */
-#endif
-
-#if !defined(HAVE_LISTXATTR) || defined(XATTR_ADDITIONAL_OPTIONS)
 ssize_t rep_listxattr (const char *path, char *list, size_t size);
 #define listxattr(path, list, size) rep_listxattr(path, list, size)
 /* define is in "replace.h" */
-#endif
-
-#if !defined(HAVE_FLISTXATTR) || defined(XATTR_ADDITIONAL_OPTIONS)
 ssize_t rep_flistxattr (int filedes, char *list, size_t size);
 #define flistxattr(filedes, value, size) rep_flistxattr(filedes, value, size)
 /* define is in "replace.h" */
-#endif
-
-#if !defined(HAVE_REMOVEXATTR) || defined(XATTR_ADDITIONAL_OPTIONS)
 int rep_removexattr (const char *path, const char *name);
 #define removexattr(path, name) rep_removexattr(path, name)
 /* define is in "replace.h" */
-#endif
-
-#if !defined(HAVE_FREMOVEXATTR) || defined(XATTR_ADDITIONAL_OPTIONS)
 int rep_fremovexattr (int filedes, const char *name);
 #define fremovexattr(filedes, name) rep_fremovexattr(filedes, name)
 /* define is in "replace.h" */
-#endif
-
-#if !defined(HAVE_SETXATTR) || defined(XATTR_ADDITIONAL_OPTIONS)
 int rep_setxattr (const char *path, const char *name, const void *value, size_t size, int flags);
 #define setxattr(path, name, value, size, flags) rep_setxattr(path, name, value, size, flags)
 /* define is in "replace.h" */
-#endif
-
-#if !defined(HAVE_FSETXATTR) || defined(XATTR_ADDITIONAL_OPTIONS)
 int rep_fsetxattr (int filedes, const char *name, const void *value, size_t size, int flags);
 #define fsetxattr(filedes, name, value, size, flags) rep_fsetxattr(filedes, name, value, size, flags)
 /* define is in "replace.h" */
+
+#endif /* !defined(HAVE_XATTR_XATTR) || defined(XATTR_ADDITIONAL_OPTIONS) */
+
+#ifdef HAVE_LINUX_OPENAT2_H
+#include <linux/openat2.h>
+#else /* ! HAVE_LINUX_OPENAT2_H */
+/* how->resolve flags for openat2(2). */
+#define RESOLVE_NO_XDEV		0x01 /* Block mount-point crossings
+					(includes bind-mounts). */
+#define RESOLVE_NO_MAGICLINKS	0x02 /* Block traversal through procfs-style
+					"magic-links". */
+#define RESOLVE_NO_SYMLINKS	0x04 /* Block traversal through all symlinks
+					(implies OEXT_NO_MAGICLINKS) */
+#define RESOLVE_BENEATH		0x08 /* Block "lexical" trickery like
+					"..", symlinks, and absolute
+					paths which escape the dirfd. */
+#define RESOLVE_IN_ROOT		0x10 /* Make all jumps to "/" and ".."
+					be scoped inside the dirfd
+					(similar to chroot(2)). */
+#define RESOLVE_CACHED		0x20 /* Only complete if resolution can be
+					completed through cached lookup. May
+					return -EAGAIN if that's not
+					possible. */
+struct __rep_open_how {
+	uint64_t flags;
+	uint64_t mode;
+	uint64_t resolve;
+};
+#define open_how __rep_open_how
+#endif /* ! HAVE_LINUX_OPENAT2_H */
+
+#ifndef HAVE_OPENAT2
+long rep_openat2(int dirfd, const char *pathname,
+		 struct open_how *how, size_t size);
+#define openat2(dirfd, pathname, how, size) \
+	rep_openat2(dirfd, pathname, how, size)
+#endif /* !HAVE_OPENAT2 */
+
+#ifdef DISABLE_OPATH
+/*
+ * Without O_PATH, the kernel
+ * most likely doesn't have renameat2() too
+ * and we should test the fallback code
+ */
+#undef HAVE_RENAMEAT2
 #endif
+
+#ifndef HAVE_RENAMEAT2
+
+#ifndef RENAME_NOREPLACE
+# define RENAME_NOREPLACE (1 << 0)
+#endif
+
+#ifndef RENAME_EXCHANGE
+# define RENAME_EXCHANGE (1 << 1)
+#endif
+
+#ifndef RENAME_WHITEOUT
+# define RENAME_WHITEOUT (1 << 2)
+#endif
+
+int rep_renameat2(int __oldfd, const char *__old, int __newfd,
+		  const char *__new, unsigned int __flags);
+#define renameat2(__oldfd, __old, __newfd, __new, __flags) \
+	rep_renameat2(__oldfd, __old, __newfd, __new, __flags)
+#endif /* !HAVE_RENAMEAT2 */
 
 #endif

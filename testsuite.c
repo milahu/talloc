@@ -1,14 +1,14 @@
-/* 
+/*
    Unix SMB/CIFS implementation.
 
    local testing of talloc routines.
 
    Copyright (C) Andrew Tridgell 2004
-   
+
      ** NOTE! The following LGPL license applies to the talloc
      ** library. This does NOT imply that all of Samba is released
      ** under the LGPL
-   
+
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
    License as published by the Free Software Foundation; either
@@ -42,6 +42,14 @@
 
 #include "talloc_testsuite.h"
 
+#ifndef disable_optimization
+#if __has_attribute(optimize)
+#define disable_optimization __attribute__((optimize("O0")))
+#else /* disable_optimization */
+#define disable_optimization
+#endif
+#endif /* disable_optimization */
+
 static struct timeval private_timeval_current(void)
 {
 	struct timeval tv;
@@ -52,7 +60,7 @@ static struct timeval private_timeval_current(void)
 static double private_timeval_elapsed(struct timeval *tv)
 {
 	struct timeval tv2 = private_timeval_current();
-	return (tv2.tv_sec - tv->tv_sec) + 
+	return (tv2.tv_sec - tv->tv_sec) +
 	       (tv2.tv_usec - tv->tv_usec)*1.0e-6;
 }
 
@@ -63,7 +71,9 @@ static double private_timeval_elapsed(struct timeval *tv)
 }
 
 #define torture_assert_str_equal(test, arg1, arg2, desc) \
-	if (arg1 == NULL && arg2 == NULL) {				\
+	if (arg1 == NULL && arg2 == NULL) { /* OK, both NULL == equal */ \
+	} else if (arg1 == NULL || arg2 == NULL) {			\
+		return false;						\
 	} else if (strcmp(arg1, arg2)) {			\
 		printf("failure: %s [\n%s: Expected %s, got %s: %s\n]\n", \
 		   test, __location__, arg1, arg2, desc); \
@@ -133,7 +143,7 @@ static void test_log_stdout(const char *message)
 }
 
 /*
-  test references 
+  test references
 */
 static bool test_ref1(void)
 {
@@ -148,7 +158,7 @@ static bool test_ref1(void)
 	talloc_named_const(p1, 2, "x2");
 	talloc_named_const(p1, 3, "x3");
 
-	r1 = talloc_named_const(root, 1, "r1");	
+	r1 = talloc_named_const(root, 1, "r1");
 	ref = talloc_reference(r1, p2);
 	talloc_report_full(root, stderr);
 
@@ -190,7 +200,7 @@ static bool test_ref1(void)
 }
 
 /*
-  test references 
+  test references
 */
 static bool test_ref2(void)
 {
@@ -204,7 +214,7 @@ static bool test_ref2(void)
 	talloc_named_const(p1, 1, "x3");
 	p2 = talloc_named_const(p1, 1, "p2");
 
-	r1 = talloc_named_const(root, 1, "r1");	
+	r1 = talloc_named_const(root, 1, "r1");
 	ref = talloc_reference(r1, p2);
 	talloc_report_full(root, stderr);
 
@@ -245,7 +255,7 @@ static bool test_ref2(void)
 }
 
 /*
-  test references 
+  test references
 */
 static bool test_ref3(void)
 {
@@ -285,7 +295,7 @@ static bool test_ref3(void)
 }
 
 /*
-  test references 
+  test references
 */
 static bool test_ref4(void)
 {
@@ -300,7 +310,7 @@ static bool test_ref4(void)
 	talloc_named_const(p1, 1, "x3");
 	p2 = talloc_named_const(p1, 1, "p2");
 
-	r1 = talloc_named_const(root, 1, "r1");	
+	r1 = talloc_named_const(root, 1, "r1");
 	ref = talloc_reference(r1, p2);
 	talloc_report_full(root, stderr);
 
@@ -336,7 +346,7 @@ static bool test_ref4(void)
 
 
 /*
-  test references 
+  test references
 */
 static bool test_unlink1(void)
 {
@@ -351,7 +361,7 @@ static bool test_unlink1(void)
 	talloc_named_const(p1, 1, "x3");
 	p2 = talloc_named_const(p1, 1, "p2");
 
-	r1 = talloc_named_const(p1, 1, "r1");	
+	r1 = talloc_named_const(p1, 1, "r1");
 	ref = talloc_reference(r1, p2);
 	talloc_report_full(root, stderr);
 
@@ -437,11 +447,11 @@ static bool test_misc(void)
 	CHECK_BLOCKS("misc", p1, 2);
 	CHECK_BLOCKS("misc", root, 3);
 
-	torture_assert("misc", talloc_free(NULL) == -1, 
+	torture_assert("misc", talloc_free(NULL) == -1,
 				   "talloc_free(NULL) should give -1\n");
 
 	talloc_set_destructor(p1, fail_destructor);
-	torture_assert("misc", talloc_free(p1) == -1, 
+	torture_assert("misc", talloc_free(p1) == -1,
 		"Failed destructor should cause talloc_free to fail\n");
 	talloc_set_destructor(p1, NULL);
 
@@ -456,10 +466,10 @@ static bool test_misc(void)
 		"failed: strdup on NULL should give NULL\n");
 
 	p2 = talloc_strndup(p1, "foo", 2);
-	torture_assert("misc", strcmp("fo", p2) == 0, 
+	torture_assert("misc", strcmp("fo", p2) == 0,
 				   "strndup doesn't work\n");
 	p2 = talloc_asprintf_append_buffer(p2, "o%c", 'd');
-	torture_assert("misc", strcmp("food", p2) == 0, 
+	torture_assert("misc", strcmp("food", p2) == 0,
 				   "talloc_asprintf_append_buffer doesn't work\n");
 	CHECK_BLOCKS("misc", p2, 1);
 	CHECK_BLOCKS("misc", p1, 3);
@@ -632,7 +642,7 @@ static bool test_realloc_child(void)
 	el1->list3 = talloc(el1, struct el2 *);
 	el1->list3[0] = talloc(el1->list3, struct el2);
 	el1->list3[0]->name = talloc_strdup(el1->list3[0], "testing2");
-	
+
 	el2 = talloc(el1->list, struct el2);
 	CHECK_PARENT("el2", el2, el1->list);
 	el2_2 = talloc(el1->list2, struct el2);
@@ -740,7 +750,7 @@ static bool test_steal(void)
 	talloc_steal(root, p2);
 	CHECK_BLOCKS("steal", root, 2);
 	CHECK_SIZE("steal", root, 20);
-	
+
 	talloc_free(p2);
 
 	CHECK_BLOCKS("steal", root, 1);
@@ -849,9 +859,14 @@ static bool test_unref_reparent(void)
 	return true;
 }
 
+/* Make the size big enough to not fit into the stack */
+#define ALLOC_SIZE (128 * 1024)
+#define ALLOC_DUP_STRING "talloc talloc talloc talloc talloc talloc talloc"
+
 /*
   measure the speed of talloc versus malloc
 */
+static bool test_speed(void) disable_optimization;
 static bool test_speed(void)
 {
 	void *ctx = talloc_new(NULL);
@@ -867,9 +882,9 @@ static bool test_speed(void)
 	do {
 		void *p1, *p2, *p3;
 		for (i=0;i<loop;i++) {
-			p1 = talloc_size(ctx, loop % 100);
-			p2 = talloc_strdup(p1, "foo bar");
-			p3 = talloc_size(p1, 300);
+			p1 = talloc_size(ctx, loop % ALLOC_SIZE);
+			p2 = talloc_strdup(p1, ALLOC_DUP_STRING);
+			p3 = talloc_size(p1, ALLOC_SIZE);
 			(void)p2;
 			(void)p3;
 			talloc_free(p1);
@@ -877,20 +892,20 @@ static bool test_speed(void)
 		count += 3 * loop;
 	} while (private_timeval_elapsed(&tv) < 5.0);
 
-	fprintf(stderr, "talloc: %.0f ops/sec\n", count/private_timeval_elapsed(&tv));
+	fprintf(stderr, "talloc:\t\t%.0f ops/sec\n", count/private_timeval_elapsed(&tv));
 
 	talloc_free(ctx);
 
-	ctx = talloc_pool(NULL, 1024);
+	ctx = talloc_pool(NULL, ALLOC_SIZE * 2);
 
 	tv = private_timeval_current();
 	count = 0;
 	do {
 		void *p1, *p2, *p3;
 		for (i=0;i<loop;i++) {
-			p1 = talloc_size(ctx, loop % 100);
-			p2 = talloc_strdup(p1, "foo bar");
-			p3 = talloc_size(p1, 300);
+			p1 = talloc_size(ctx, loop % ALLOC_SIZE);
+			p2 = talloc_strdup(p1, ALLOC_DUP_STRING);
+			p3 = talloc_size(p1, ALLOC_SIZE);
 			(void)p2;
 			(void)p3;
 			talloc_free(p1);
@@ -900,23 +915,62 @@ static bool test_speed(void)
 
 	talloc_free(ctx);
 
-	fprintf(stderr, "talloc_pool: %.0f ops/sec\n", count/private_timeval_elapsed(&tv));
+	fprintf(stderr, "talloc_pool:\t%.0f ops/sec\n", count/private_timeval_elapsed(&tv));
 
 	tv = private_timeval_current();
 	count = 0;
 	do {
 		void *p1, *p2, *p3;
 		for (i=0;i<loop;i++) {
-			p1 = malloc(loop % 100);
-			p2 = strdup("foo bar");
-			p3 = malloc(300);
+			p1 = malloc(loop % ALLOC_SIZE);
+			p2 = strdup(ALLOC_DUP_STRING);
+			p3 = malloc(ALLOC_SIZE);
 			free(p1);
 			free(p2);
 			free(p3);
 		}
 		count += 3 * loop;
 	} while (private_timeval_elapsed(&tv) < 5.0);
-	fprintf(stderr, "malloc: %.0f ops/sec\n", count/private_timeval_elapsed(&tv));
+	fprintf(stderr, "malloc:\t\t%.0f ops/sec\n", count/private_timeval_elapsed(&tv));
+
+	printf("\n# TALLOC_ZERO VS CALLOC SPEED\n");
+
+	ctx = talloc_new(NULL);
+
+	tv = private_timeval_current();
+	count = 0;
+	do {
+		void *p1, *p2, *p3;
+		for (i=0;i<loop;i++) {
+			p1 = talloc_zero_size(ctx, loop % ALLOC_SIZE);
+			p2 = talloc_strdup(p1, ALLOC_DUP_STRING);
+			p3 = talloc_zero_size(p1, ALLOC_SIZE);
+			(void)p2;
+			(void)p3;
+			talloc_free(p1);
+		}
+		count += 3 * loop;
+	} while (private_timeval_elapsed(&tv) < 5.0);
+
+	fprintf(stderr, "talloc_zero:\t%.0f ops/sec\n", count/private_timeval_elapsed(&tv));
+
+	talloc_free(ctx);
+
+	tv = private_timeval_current();
+	count = 0;
+	do {
+		void *p1, *p2, *p3;
+		for (i=0;i<loop;i++) {
+			p1 = calloc(1, loop % ALLOC_SIZE);
+			p2 = strdup(ALLOC_DUP_STRING);
+			p3 = calloc(1, ALLOC_SIZE);
+			free(p1);
+			free(p2);
+			free(p3);
+		}
+		count += 3 * loop;
+	} while (private_timeval_elapsed(&tv) < 5.0);
+	fprintf(stderr, "calloc:\t\t%.0f ops/sec\n", count/private_timeval_elapsed(&tv));
 
 	printf("success: speed\n");
 
@@ -926,15 +980,15 @@ static bool test_speed(void)
 static bool test_lifeless(void)
 {
 	void *top = talloc_new(NULL);
-	char *parent, *child; 
+	char *parent, *child;
 	void *child_owner = talloc_new(NULL);
 
 	printf("test: lifeless\n# TALLOC_UNLINK LOOP\n");
 
 	parent = talloc_strdup(top, "parent");
-	child = talloc_strdup(parent, "child");  
+	child = talloc_strdup(parent, "child");
 	(void)talloc_reference(child, parent);
-	(void)talloc_reference(child_owner, child); 
+	(void)talloc_reference(child_owner, child);
 	talloc_report_full(top, stderr);
 	talloc_unlink(top, parent);
 	talloc_unlink(top, child);
@@ -967,7 +1021,7 @@ static bool test_loop(void)
 
 	parent = talloc_strdup(top, "parent");
 	req1 = talloc(parent, struct req1);
-	req1->req2 = talloc_strdup(req1, "req2");  
+	req1->req2 = talloc_strdup(req1, "req2");
 	talloc_set_destructor(req1->req2, test_loop_destructor);
 	req1->req3 = talloc_strdup(req1, "req3");
 	(void)talloc_reference(req1->req3, req1);
@@ -977,7 +1031,7 @@ static bool test_loop(void)
 	talloc_report_full(NULL, stderr);
 	talloc_free(top);
 
-	torture_assert("loop", loop_destructor_count == 1, 
+	torture_assert("loop", loop_destructor_count == 1,
 				   "FAILED TO FIRE LOOP DESTRUCTOR\n");
 	loop_destructor_count = 0;
 
@@ -1033,6 +1087,8 @@ static bool test_realloc_on_destructor_parent(void)
 
 
 	printf("success: free_for_exit\n");
+	talloc_free(top); /* make ASAN happy */
+
 	return true;
 }
 
@@ -1262,6 +1318,8 @@ static bool test_talloc_free_in_destructor(void)
 
 	talloc_free(level0);
 
+	talloc_free(level3); /* make ASAN happy */
+
 	printf("success: free_in_destructor\n");
 	return true;
 }
@@ -1301,7 +1359,6 @@ static bool test_pool(void)
 	p4 = talloc_size(p3, 1000);
 	memset(p4, 0x11, talloc_get_size(p4));
 
-#if 1 /* this relies on ALWAYS_REALLOC == 0 in talloc.c */
 	p2_2 = talloc_realloc_size(pool, p2, 20+1);
 	torture_assert("pool realloc 20+1", p2_2 == p2, "failed: pointer changed");
 	memset(p2, 0x11, talloc_get_size(p2));
@@ -1366,8 +1423,6 @@ static bool test_pool(void)
 	torture_assert("pool alloc 800", p3 == p1, "failed: pointer changed");
 	memset(p3, 0x11, talloc_get_size(p3));
 
-#endif /* this relies on ALWAYS_REALLOC == 0 in talloc.c */
-
 	talloc_free(pool);
 
 	return true;
@@ -1402,7 +1457,6 @@ static bool test_pool_steal(void)
 
 	p1_2 = p1;
 
-#if 1 /* this relies on ALWAYS_REALLOC == 0 in talloc.c */
 	p1_2 = talloc_realloc_size(root, p1, 5 * 16);
 	torture_assert("pool realloc 5 * 16", p1_2 > p2, "failed: pointer not changed");
 	memset(p1_2, 0x11, talloc_get_size(p1_2));
@@ -1414,13 +1468,11 @@ static bool test_pool_steal(void)
 	p2_2 = talloc_realloc_size(root, p2, 3 * 16);
 	torture_assert("pool realloc 5 * 16", p2_2 == p2, "failed: pointer changed");
 	memset(p2_2, 0x11, talloc_get_size(p2_2));
-#endif /* this relies on ALWAYS_REALLOC == 0 in talloc.c */
 
 	talloc_free(p1_2);
 
 	p2_2 = p2;
 
-#if 1 /* this relies on ALWAYS_REALLOC == 0 in talloc.c */
 	/* now we should reclaim the full pool */
 	p2_2 = talloc_realloc_size(root, p2, 8 * 16);
 	torture_assert("pool realloc 8 * 16", p2_2 == p1, "failed: pointer not expected");
@@ -1431,8 +1483,6 @@ static bool test_pool_steal(void)
 	p2_2 = talloc_realloc_size(root, p2, 2 * 1024);
 	torture_assert("pool realloc 2 * 1024", p2_2 != p1, "failed: pointer not expected");
 	memset(p2_2, 0x11, talloc_get_size(p2_2));
-
-#endif /* this relies on ALWAYS_REALLOC == 0 in talloc.c */
 
 	talloc_free(p2_2);
 
@@ -1461,6 +1511,8 @@ static bool test_pool_nest(void)
 	talloc_free(p3);
 
 	talloc_free(p1);
+
+	talloc_free(e); /* make ASAN happy */
 
 	return true;
 }
@@ -1532,7 +1584,7 @@ static bool test_free_ref_null_context(void)
 static bool test_rusty(void)
 {
 	void *root;
-	const char *p1;
+	char *p1;
 
 	talloc_enable_null_tracking();
 	root = talloc_new(NULL);
@@ -1541,6 +1593,8 @@ static bool test_rusty(void)
 	talloc_report_full(root, stdout);
 	talloc_free(root);
 	CHECK_BLOCKS("null_context", NULL, 2);
+	talloc_free(p1); /* make ASAN happy */
+
 	return true;
 }
 
@@ -1757,27 +1811,144 @@ static bool test_memlimit(void)
 	talloc_free(root);
 
 	/* Test memlimits with pools. */
+	printf("==== talloc_pool(NULL, 10*1024)\n");
 	pool = talloc_pool(NULL, 10*1024);
 	torture_assert("memlimit", pool != NULL,
 		"failed: alloc should not fail due to memory limit\n");
+
+	printf("==== talloc_set_memlimit(pool, 10*1024)\n");
 	talloc_set_memlimit(pool, 10*1024);
 	for (i = 0; i < 9; i++) {
+		printf("==== talloc_size(pool, 1024) %i/10\n", i + 1);
 		l1 = talloc_size(pool, 1024);
 		torture_assert("memlimit", l1 != NULL,
 			"failed: alloc should not fail due to memory limit\n");
+		talloc_report_full(pool, stdout);
 	}
 	/* The next alloc should fail. */
+	printf("==== talloc_size(pool, 1024) 10/10\n");
 	l2 = talloc_size(pool, 1024);
 	torture_assert("memlimit", l2 == NULL,
 			"failed: alloc should fail due to memory limit\n");
 
+	talloc_report_full(pool, stdout);
+
 	/* Moving one of the children shouldn't change the limit,
 	   as it's still inside the pool. */
+
+	printf("==== talloc_new(NULL)\n");
 	root = talloc_new(NULL);
+
+	printf("==== talloc_steal(root, l1)\n");
 	talloc_steal(root, l1);
+
+	printf("==== talloc_size(pool, 1024)\n");
 	l2 = talloc_size(pool, 1024);
 	torture_assert("memlimit", l2 == NULL,
 			"failed: alloc should fail due to memory limit\n");
+
+	printf("==== talloc_free_children(pool)\n");
+	talloc_free(l1);
+	talloc_free_children(pool);
+
+	printf("==== talloc_size(pool, 1024)\n");
+	l1 = talloc_size(pool, 1024);
+
+	/* try reallocs of increasing size */
+	for (i = 1; i < 9; i++) {
+		printf("==== talloc_realloc_size(NULL, l1, %i*1024) %i/10\n", i, i + 1);
+		l1 = talloc_realloc_size(NULL, l1, i*1024);
+		torture_assert("memlimit", l1 != NULL,
+			"failed: realloc should not fail due to memory limit\n");
+		talloc_report_full(pool, stdout);
+	}
+	/* The next alloc should fail. */
+	printf("==== talloc_realloc_size(NULL, l1, 10*1024) 10/10\n");
+	l2 = talloc_realloc_size(NULL, l1, 10*1024);
+	torture_assert("memlimit", l2 == NULL,
+			"failed: realloc should fail due to memory limit\n");
+
+	/* Increase the memlimit */
+	printf("==== talloc_set_memlimit(pool, 11*1024)\n");
+	talloc_set_memlimit(pool, 11*1024);
+
+	/* The final realloc should still fail
+	   as the entire realloced chunk needs to be moved out of the pool */
+	printf("==== talloc_realloc_size(NULL, l1, 10*1024) 10/10\n");
+	l2 = talloc_realloc_size(NULL, l1, 10*1024);
+	torture_assert("memlimit", l2 == NULL,
+			"failed: realloc should fail due to memory limit\n");
+
+	talloc_report_full(pool, stdout);
+
+	printf("==== talloc_set_memlimit(pool, 21*1024)\n");
+	talloc_set_memlimit(pool, 21*1024);
+
+	/* There's now sufficient space to move the chunk out of the pool */
+	printf("==== talloc_realloc_size(NULL, l1, 10*1024) 10/10\n");
+	l2 = talloc_realloc_size(NULL, l1, 10*1024);
+	torture_assert("memlimit", l2 != NULL,
+			"failed: realloc should not fail due to memory limit\n");
+
+	talloc_report_full(pool, stdout);
+
+	/* ...which should mean smaller allocations can now occur within the pool */
+	printf("==== talloc_size(pool, 9*1024)\n");
+	l1 = talloc_size(pool, 9*1024);
+	torture_assert("memlimit", l1 != NULL,
+			"failed: new allocations should be allowed in the pool\n");
+
+	talloc_report_full(pool, stdout);
+
+	/* But reallocs bigger than the pool will still fail */
+	printf("==== talloc_realloc_size(NULL, l1, 10*1024)\n");
+	l2 = talloc_realloc_size(NULL, l1, 10*1024);
+	torture_assert("memlimit", l2 == NULL,
+			"failed: realloc should fail due to memory limit\n");
+
+	talloc_report_full(pool, stdout);
+
+	/* ..as well as allocs */
+	printf("==== talloc_size(pool, 1024)\n");
+	l1 = talloc_size(pool, 1024);
+	torture_assert("memlimit", l1 == NULL,
+			"failed: alloc should fail due to memory limit\n");
+
+	talloc_report_full(pool, stdout);
+
+	printf("==== talloc_free_children(pool)\n");
+	talloc_free_children(pool);
+
+	printf("==== talloc_set_memlimit(pool, 1024)\n");
+	talloc_set_memlimit(pool, 1024);
+
+	/* We should still be able to allocate up to the pool limit
+	   because the memlimit only applies to new heap allocations */
+	printf("==== talloc_size(pool, 9*1024)\n");
+	l1 = talloc_size(pool, 9*1024);
+	torture_assert("memlimit", l1 != NULL,
+			"failed: alloc should not fail due to memory limit\n");
+
+	talloc_report_full(pool, stdout);
+
+	l1 = talloc_size(pool, 1024);
+	torture_assert("memlimit", l1 == NULL,
+			"failed: alloc should fail due to memory limit\n");
+
+	talloc_report_full(pool, stdout);
+
+	printf("==== talloc_free_children(pool)\n");
+	talloc_free_children(pool);
+
+	printf("==== talloc_set_memlimit(pool, 10*1024)\n");
+	talloc_set_memlimit(pool, 10*1024);
+
+	printf("==== talloc_size(pool, 1024)\n");
+	l1 = talloc_size(pool, 1024);
+	torture_assert("memlimit", l1 != NULL,
+			"failed: alloc should not fail due to memory limit\n");
+
+	talloc_report_full(pool, stdout);
 
 	talloc_free(pool);
 	talloc_free(root);
@@ -1978,10 +2149,76 @@ static bool test_magic_protection(void)
 		 *
 		 * Real attacks would attempt to set a real destructor.
 		 */
-		memset(p1, '\0', 32);
+		BURN_PTR_SIZE(p1, 32);
 
 		/* Then the attack takes effect when the memory's freed. */
 		talloc_free(pool);
+
+		/* Never reached. Make compilers happy */
+		return true;
+	}
+
+	while (wait(&exit_status) != pid);
+
+	talloc_free(pool); /* make ASAN happy */
+
+	if (!WIFEXITED(exit_status)) {
+		printf("Child exited through unexpected abnormal means\n");
+		return false;
+	}
+	if (WEXITSTATUS(exit_status) != 42) {
+		printf("Child exited with wrong exit status\n");
+		return false;
+	}
+	if (WIFSIGNALED(exit_status)) {
+		printf("Child received unexpected signal\n");
+		return false;
+	}
+
+	printf("success: magic_protection\n");
+	return true;
+}
+
+static void test_magic_free_protection_abort(const char *reason)
+{
+	/* exit with errcode 42 to communicate successful test to the parent process */
+	if (strcmp(reason, "Bad talloc magic value - access after free") == 0) {
+		_exit(42);
+	}
+	/* not 42 */
+	_exit(404);
+}
+
+static bool test_magic_free_protection(void)
+{
+	void *pool = talloc_pool(NULL, 1024);
+	int *p1, *p2, *p3;
+	pid_t pid;
+	int exit_status;
+
+	printf("test: magic_free_protection\n");
+	p1 = talloc(pool, int);
+	p2 = talloc(pool, int);
+
+	/* To avoid complaints from the compiler assign values to the p1 & p2. */
+	*p1 = 6;
+	*p2 = 9;
+
+	p3 = talloc_realloc(pool, p2, int, 2048);
+	torture_assert("pool realloc 2048",
+		       p3 != p2,
+		       "failed: pointer not changed");
+
+	/*
+	 * Now access the memory in the pool after the realloc().  It
+	 * should be marked as free, so use of the old pointer should
+	 * trigger the abort function
+	 */
+	pid = fork();
+	if (pid == 0) {
+		talloc_set_abort_fn(test_magic_free_protection_abort);
+
+		talloc_get_name(p2);
 
 		/* Never reached. Make compilers happy */
 		return true;
@@ -1998,11 +2235,13 @@ static bool test_magic_protection(void)
 		return false;
 	}
 	if (WIFSIGNALED(exit_status)) {
-		printf("Child recieved unexpected signal\n");
+		printf("Child received unexpected signal\n");
 		return false;
 	}
 
-	printf("success: magic_protection\n");
+	talloc_free(pool);
+
+	printf("success: magic_free_protection\n");
 	return true;
 }
 
@@ -2033,29 +2272,29 @@ bool torture_local_talloc(struct torture_context *tctx)
 	test_reset();
 	ret &= test_ref4();
 	test_reset();
-	ret &= test_unlink1(); 
+	ret &= test_unlink1();
 	test_reset();
 	ret &= test_misc();
 	test_reset();
 	ret &= test_realloc();
 	test_reset();
-	ret &= test_realloc_child(); 
+	ret &= test_realloc_child();
 	test_reset();
-	ret &= test_steal(); 
+	ret &= test_steal();
 	test_reset();
-	ret &= test_move(); 
+	ret &= test_move();
 	test_reset();
 	ret &= test_unref_reparent();
 	test_reset();
-	ret &= test_realloc_fn(); 
+	ret &= test_realloc_fn();
 	test_reset();
 	ret &= test_type();
 	test_reset();
-	ret &= test_lifeless(); 
+	ret &= test_lifeless();
 	test_reset();
 	ret &= test_loop();
 	test_reset();
-	ret &= test_free_parent_deny_child(); 
+	ret &= test_free_parent_deny_child();
 	test_reset();
 	ret &= test_realloc_on_destructor_parent();
 	test_reset();
@@ -2092,6 +2331,8 @@ bool torture_local_talloc(struct torture_context *tctx)
 	ret &= test_autofree();
 	test_reset();
 	ret &= test_magic_protection();
+	test_reset();
+	ret &= test_magic_free_protection();
 
 	test_reset();
 	talloc_disable_null_tracking();

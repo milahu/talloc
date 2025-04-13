@@ -43,12 +43,11 @@ testsuite.c to clarify how some particular situation is handled.
 Performance
 -----------
 
-All the additional features of talloc() over malloc() do come at a
-price. We have a simple performance test in Samba4 that measures
-talloc() versus malloc() performance, and it seems that talloc() is
-about 4% slower than malloc() on my x86 Debian Linux box. For Samba,
-the great reduction in code complexity that we get by using talloc
-makes this worthwhile, especially as the total overhead of
+All the additional features of talloc() over malloc() do come at a price. We
+have a performance test in Samba4 that measures talloc() versus malloc()
+performance, and it seems that talloc() is about 50% slower than malloc() (AMD
+Ryzen 9 3900X). For Samba, the great reduction in code complexity that we get by
+using talloc makes this worthwhile, especially as the total overhead of
 talloc/malloc in Samba is already quite small.
 
 
@@ -189,7 +188,7 @@ ways:
 
   - you can talloc_free() the pointer itself if it has at maximum one
     parent. This behaviour has been changed since the release of version
-    2.0. Further informations in the description of "talloc_free".
+    2.0. Further information in the description of "talloc_free".
 
 For more control on which parent to remove, see talloc_unlink()
 
@@ -207,7 +206,7 @@ is NULL, then the function will make no modifications and return -1.
 
 You can just use talloc_free() instead of talloc_unlink() if there
 is at maximum one parent. This behaviour has been changed since the
-release of version 2.0. Further informations in the description of
+release of version 2.0. Further information in the description of
 "talloc_free".
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

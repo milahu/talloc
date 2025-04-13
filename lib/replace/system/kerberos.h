@@ -29,13 +29,16 @@
 
 #ifdef HAVE_KRB5
 
-#if HAVE_KRB5_H
+#ifdef HAVE_KRB5_H
 #include <krb5.h>
 #endif
 
-#if HAVE_COM_ERR_H
+#ifdef HAVE_COM_ERR_H
 #include <com_err.h>
 #endif
+
+#define krb5_cc_default __ERROR__XX__NEVER_USE_krb5_cc_default__;
+#define krb5_cc_default_name __ERROR__XX__NEVER_USE_krb5_cc_default_name__;
 
 #endif
 #endif

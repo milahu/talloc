@@ -33,6 +33,10 @@
 #include "system/locale.h"
 #include "system/wait.h"
 
+#ifdef HAVE_SYS_SYSCALL_H
+#include <sys/syscall.h>
+#endif
+
 #ifdef _WIN32
 #define mkdir(d,m) _mkdir(d)
 #endif
@@ -547,7 +551,7 @@ long long int rep_strtoll(const char *str, char **endptr, int base)
 	if (errno == EINVAL) {
 		if (base == 0 || (base >1 && base <37)) {
 			/* Base was ok so it's because we were not
-			 * able to make the convertion.
+			 * able to make the conversion.
 			 * Let's reset errno.
 			 */
 			errno = saved_errno;
@@ -583,7 +587,7 @@ unsigned long long int rep_strtoull(const char *str, char **endptr, int base)
 	if (errno == EINVAL) {
 		if (base == 0 || (base >1 && base <37)) {
 			/* Base was ok so it's because we were not
-			 * able to make the convertion.
+			 * able to make the conversion.
 			 * Let's reset errno.
 			 */
 			errno = saved_errno;
@@ -942,3 +946,291 @@ void rep_setproctitle(const char *fmt, ...)
 {
 }
 #endif
+#ifndef HAVE_SETPROCTITLE_INIT
+void rep_setproctitle_init(int argc, char *argv[], char *envp[])
+{
+}
+#endif
+
+#ifndef HAVE_MEMSET_S
+# ifndef RSIZE_MAX
+#  define RSIZE_MAX (SIZE_MAX >> 1)
+# endif
+
+int rep_memset_s(void *dest, size_t destsz, int ch, size_t count)
+{
+	if (dest == NULL) {
+		return EINVAL;
+	}
+
+	if (destsz > RSIZE_MAX ||
+	    count > RSIZE_MAX ||
+	    count > destsz) {
+		return ERANGE;
+	}
+
+#if defined(HAVE_MEMSET_EXPLICIT)
+	memset_explicit(dest, ch, count);
+#else /* HAVE_MEMSET_EXPLICIT */
+	memset(dest, ch, count);
+# if defined(HAVE_GCC_VOLATILE_MEMORY_PROTECTION)
+	/* See http://llvm.org/bugs/show_bug.cgi?id=15495 */
+	__asm__ volatile("" : : "g"(dest) : "memory");
+# endif /* HAVE_GCC_VOLATILE_MEMORY_PROTECTION */
+#endif /* HAVE_MEMSET_EXPLICIT */
+
+	return 0;
+}
+#endif /* HAVE_MEMSET_S */
+
+#ifndef HAVE_GETPROGNAME
+# ifndef HAVE_PROGRAM_INVOCATION_SHORT_NAME
+# define PROGNAME_SIZE 32
+static char rep_progname[PROGNAME_SIZE];
+# endif /* HAVE_PROGRAM_INVOCATION_SHORT_NAME */
+
+const char *rep_getprogname(void)
+{
+#ifdef HAVE_PROGRAM_INVOCATION_SHORT_NAME
+	return program_invocation_short_name;
+#else /* HAVE_PROGRAM_INVOCATION_SHORT_NAME */
+	FILE *fp = NULL;
+	char cmdline[4096] = {0};
+	char *p = NULL;
+	pid_t pid;
+	size_t nread;
+	int len;
+	int rc;
+
+	if (rep_progname[0] != '\0') {
+		return rep_progname;
+	}
+
+	len = snprintf(rep_progname, sizeof(rep_progname), "%s", "<unknown>");
+	if (len <= 0) {
+		return NULL;
+	}
+
+	pid = getpid();
+	if (pid <= 1 || pid == (pid_t)-1) {
+		return NULL;
+	}
+
+	len = snprintf(cmdline,
+		       sizeof(cmdline),
+		       "/proc/%u/cmdline",
+		       (unsigned int)pid);
+	if (len <= 0 || len == sizeof(cmdline)) {
+		return NULL;
+	}
+
+	fp = fopen(cmdline, "r");
+	if (fp == NULL) {
+		return NULL;
+	}
+
+	nread = fread(cmdline, 1, sizeof(cmdline) - 1, fp);
+
+	rc = fclose(fp);
+	if (rc != 0) {
+		return NULL;
+	}
+
+	if (nread == 0) {
+		return NULL;
+	}
+
+	cmdline[nread] = '\0';
+
+	p = strrchr(cmdline, '/');
+	if (p != NULL) {
+		p++;
+	} else {
+		p = cmdline;
+	}
+
+	len = strlen(p);
+	if (len > PROGNAME_SIZE) {
+		p[PROGNAME_SIZE - 1] = '\0';
+	}
+
+	(void)snprintf(rep_progname, sizeof(rep_progname), "%s", p);
+
+	return rep_progname;
+#endif /* HAVE_PROGRAM_INVOCATION_SHORT_NAME */
+}
+#endif /* HAVE_GETPROGNAME */
+
+#ifndef HAVE_COPY_FILE_RANGE
+ssize_t rep_copy_file_range(int fd_in,
+			    loff_t *off_in,
+			    int fd_out,
+			    loff_t *off_out,
+			    size_t len,
+			    unsigned int flags)
+{
+# ifdef HAVE_SYSCALL_COPY_FILE_RANGE
+	return syscall(__NR_copy_file_range,
+		       fd_in,
+		       off_in,
+		       fd_out,
+		       off_out,
+		       len,
+		       flags);
+# endif /* HAVE_SYSCALL_COPY_FILE_RANGE */
+	errno = ENOSYS;
+	return -1;
+}
+#endif /* HAVE_COPY_FILE_RANGE */
+
+#ifdef HAVE_LINUX_IOCTL
+# include <linux/fs.h>
+# include <sys/ioctl.h>
+#endif
+
+ssize_t rep_copy_reflink(int src_fd,
+			 off_t src_off,
+			 int dst_fd,
+			 off_t dst_off,
+			 off_t to_copy)
+{
+#ifdef HAVE_LINUX_IOCTL
+	struct file_clone_range cr;
+
+	cr = (struct file_clone_range) {
+		.src_fd = src_fd,
+		.src_offset = (uint64_t)src_off,
+		.dest_offset = (uint64_t)dst_off,
+		.src_length = (uint64_t)to_copy,
+	};
+
+	return ioctl(dst_fd, FICLONERANGE, &cr);
+#else
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+#ifndef HAVE_OPENAT2
+
+/* fallback known wellknown __NR_openat2 values */
+#ifndef __NR_openat2
+# if defined(LINUX) && defined(HAVE_SYS_SYSCALL_H)
+#  if defined(__i386__)
+#   define __NR_openat2 437
+#  elif defined(__x86_64__) && defined(__LP64__)
+#   define __NR_openat2 437 /* 437 0x1B5 */
+#  elif defined(__x86_64__) && defined(__ILP32__)
+#   define __NR_openat2 1073742261 /* 1073742261 0x400001B5 */
+#  elif defined(__aarch64__)
+#   define __NR_openat2 437
+#  elif defined(__arm__)
+#   define __NR_openat2 437
+#  elif defined(__sparc__)
+#   define __NR_openat2 437
+#  endif
+# endif /* defined(LINUX) && defined(HAVE_SYS_SYSCALL_H) */
+#endif /* !__NR_openat2 */
+
+#ifdef DISABLE_OPATH
+/*
+ * systems without O_PATH also don't have openat2,
+ * so make sure we at a realistic combination.
+ */
+#undef __NR_openat2
+#endif /* DISABLE_OPATH */
+
+long rep_openat2(int dirfd, const char *pathname,
+		 struct open_how *how, size_t size)
+{
+#ifdef __NR_openat2
+#if _FILE_OFFSET_BITS == 64 && SIZE_MAX == 0xffffffffUL && defined(O_LARGEFILE)
+	struct open_how __how;
+
+#if defined(O_PATH) && ! defined(DISABLE_OPATH)
+	if ((how->flags & O_PATH) == 0)
+#endif
+	{
+		if (sizeof(__how) == size) {
+			__how = *how;
+
+			__how.flags |= O_LARGEFILE;
+			how = &__how;
+		}
+	}
+#endif
+
+	return syscall(__NR_openat2,
+		       dirfd,
+		       pathname,
+		       how,
+		       size);
+#else
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+#endif /* !HAVE_OPENAT2 */
+
+#ifndef HAVE_RENAMEAT2
+
+/* fallback to wellknown __NR_renameat2 values */
+#ifndef __NR_renameat2
+# if defined(LINUX) && defined(HAVE_SYS_SYSCALL_H)
+#  if defined(__i386__)
+#   define __NR_renameat2 353
+#  elif defined(__x86_64__) && defined(__LP64__)
+#   define __NR_renameat2 316 /* 316 0x13C */
+#  elif defined(__x86_64__) && defined(__ILP32__)
+#   define __NR_renameat2 1073742140 /* 1073742140 0x4000013C */
+#  elif defined(__aarch64__)
+#   define __NR_renameat2 276
+#  elif defined(__arm__)
+#   define __NR_renameat2 382
+#  elif defined(__sparc__)
+#   define __NR_renameat2 345
+#  endif
+# endif /* defined(LINUX) && defined(HAVE_SYS_SYSCALL_H) */
+#endif /* !__NR_renameat2 */
+
+#ifdef DISABLE_OPATH
+/*
+ * systems without O_PATH also don't have renameat2,
+ * so make sure we at a realistic combination.
+ */
+#undef __NR_renameat2
+#endif /* DISABLE_OPATH */
+
+int rep_renameat2(int __oldfd, const char *__old, int __newfd,
+		  const char *__new, unsigned int __flags)
+{
+	if (__flags != 0) {
+#ifdef __NR_renameat2
+		int ret;
+
+		ret = syscall(__NR_renameat2,
+			      __oldfd,
+			      __old,
+			      __newfd,
+			      __new,
+			      __flags);
+		if (ret != -1 || errno != ENOSYS) {
+			/*
+			 * if it's ENOSYS, we fallback
+			 * to EINVAL below, otherwise
+			 * we return what the kernel
+			 * did.
+			 */
+			return ret;
+		}
+#endif
+		errno = EINVAL;
+		return -1;
+	}
+
+	return renameat(__oldfd, __old, __newfd, __new);
+}
+#endif /* ! HAVE_RENAMEAT2 */
+
+const char hexchars_lower[] = "0123456789abcdef";
+const char hexchars_upper[] = "0123456789ABCDEF";

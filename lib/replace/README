@@ -40,7 +40,6 @@ dlclose
 dlsym
 dlerror
 chroot
-bzero
 strerror
 errno
 mkdtemp
@@ -73,6 +72,7 @@ symlink
 realpath
 poll
 setproctitle
+memset_s
 
 Types:
 bool
@@ -122,6 +122,5 @@ Optional C keywords:
 volatile
 
 Prerequisites:
-memset (for bzero)
 syslog (for vsyslog)
 mktemp (for mkstemp and mkdtemp)

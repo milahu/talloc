@@ -1,20 +1,20 @@
 # handle substitution of variables in pc files
 
 import os, re, sys
-import Build, Logs
+from waflib import Build, Logs
 from samba_utils import SUBST_VARS_RECURSIVE, TO_LIST
 
 def subst_at_vars(task):
-    '''substiture @VAR@ style variables in a file'''
+    '''substitute @VAR@ style variables in a file'''
 
     s = task.inputs[0].read()
     # split on the vars
-    a = re.split('(@\w+@)', s)
+    a = re.split(r'(@\w+@)', s)
     out = []
     done_var = {}
     back_sub = [ ('PREFIX', '${prefix}'), ('EXEC_PREFIX', '${exec_prefix}')]
     for v in a:
-        if re.match('@\w+@', v):
+        if re.match(r'@\w+@', v):
             vname = v[1:-1]
             if not vname in task.env and vname.upper() in task.env:
                 vname = vname.upper()
@@ -52,7 +52,7 @@ def PKG_CONFIG_FILES(bld, pc_files, vnum=None, extra_name=None):
                                 rule=subst_at_vars,
                                 source=f+'.in',
                                 target=target)
-        bld.add_manual_dependency(bld.path.find_or_declare(f), bld.env['PREFIX'])
+        bld.add_manual_dependency(bld.path.find_or_declare(f), bld.env['PREFIX'].encode('utf8'))
         t.vars = []
         if t.env.RPATH_ON_INSTALL:
             t.env.LIB_RPATH = t.env.RPATH_ST % t.env.LIBDIR

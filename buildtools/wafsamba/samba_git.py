@@ -4,7 +4,7 @@ import subprocess
 def find_git(env=None):
     """Find the git binary."""
     if env is not None and 'GIT' in env:
-        return env['GIT']
+        return env.get_flat('GIT')
 
     # Get version from GIT
     if os.path.exists("/usr/bin/git"):
@@ -43,6 +43,7 @@ def read_submodule_status(path, env=None):
         cwd=path)
     (stdout, stderr) = p.communicate(None)
     for l in stdout.splitlines():
+        l = l.decode('utf-8')
         l = l.rstrip()
         status = l[0]
         l = l[1:]

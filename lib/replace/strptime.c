@@ -287,7 +287,7 @@ strptime_internal (rp, fmt, tm, decided, era_cnt)
 	}
 
       /* Any character but `%' must be matched by the same character
-	 in the iput string.  */
+	 in the input string.  */
       if (*fmt != '%')
 	{
 	  match_char (*fmt++, *rp++);
@@ -462,7 +462,8 @@ strptime_internal (rp, fmt, tm, decided, era_cnt)
 	      *decided = raw;
 	    }
 #endif
-	  /* Fall through.  */
+
+	  FALL_THROUGH;
 	case 'D':
 	  /* Match standard day format.  */
 	  if (!recursive (HERE_D_FMT))
@@ -611,7 +612,8 @@ strptime_internal (rp, fmt, tm, decided, era_cnt)
 	      *decided = raw;
 	    }
 #endif
-	  /* Fall through.  */
+
+	  FALL_THROUGH;
 	case 'T':
 	  if (!recursive (HERE_T_FMT))
 	    return NULL;

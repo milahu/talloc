@@ -91,6 +91,8 @@
 #include <stropts.h>
 #endif
 
+#include <limits.h>
+
 #ifndef HAVE_SOCKLEN_T
 #define HAVE_SOCKLEN_T
 typedef int socklen_t;
@@ -332,6 +334,23 @@ typedef unsigned short int sa_family_t;
      */
 #   define IOV_MAX 512
 #  endif
+#  ifdef __GNU__
+    /*
+     * GNU/Hurd does not have such hardcoded limitations. Use a reasonable
+     * amount.
+     */
+#   define IOV_MAX 512
+#  endif
+# endif
+#endif
+
+#ifndef PIPE_BUF
+# ifdef __GNU__
+  /*
+   * GNU/Hurd does not have such hardcoded limitations. But it has to support
+   * the minimum POSIX value anyway.
+   */
+#  define PIPE_BUF 512
 # endif
 #endif
 
